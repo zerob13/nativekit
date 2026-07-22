@@ -1,0 +1,96 @@
+# --- Node ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm
+.pnpm-store/
+
+# --- Build artifacts (native) ---
+build/
+out/
+Release/
+Debug/
+*.node
+prebuilds/
+build/Release/
+build/Debug/
+cmake-build-debug/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exp
+*.pdb
+
+# --- node-gyp / cmake-js ---
+.error_gypi
+.gypgen
+
+# --- Xcode (macOS) ---
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+DerivedData/
+*.swp
+*~.nib
+*.moved-aside
+.DS_Store
+
+# --- Visual Studio (Windows) ---
+.vs/
+*.vcxproj*
+*.sln
+*.suo
+*.user
+*.aps
+*.opensdf
+*.sdf
+*.opendb
+*.VC.db
+*.VC.opendb
+ipch/
+
+# --- IDE ---
+.idea/
+.vscode/
+!.vscode/settings.json
+!.vscode/extensions.json
+*.iml
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Env / secrets ---
+.env
+.env.local
+*.pem
+*.p12
+*.cer
+*.key
+
+# --- Logs / coverage ---
+logs/
+*.log
+coverage/
+.nyc_output/
+
+# --- TypeScript ---
+*.tsbuildinfo
+js/**/*.js
+js/**/*.js.map
+js/**/*.d.ts
+!js/index.d.ts
+
+# --- Dist ---
+dist/

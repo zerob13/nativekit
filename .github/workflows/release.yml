@@ -1,0 +1,166 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v0.1.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  # -------------------------------------------------------------------
+  # Phase 1: rebuild from source on each platform (don't trust caches
+  # for release artifacts)
+  # -------------------------------------------------------------------
+  build:
+    name: Build ${{ matrix.os }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: darwin
+            arch: arm64
+            runner: macos-14
+          - os: darwin
+            arch: x64
+            runner: macos-13
+          - os: win32
+            arch: x64
+            runner: windows-2022
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --ignore-scripts
+
+      - name: Install macOS system deps
+        if: matrix.os == 'darwin'
+        run: brew install cmake
+
+      - name: Setup MSVC
+        if: matrix.os == 'win32'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.arch }}
+
+      - name: Install Windows CMake
+        if: matrix.os == 'win32'
+        run: choco install cmake -y --no-progress
+
+      - name: Build native addon
+        run: pnpm exec cmake-js build --arch=${{ matrix.arch }}
+
+      - name: Prepare prebuild artifact
+        shell: bash
+        run: |
+          mkdir -p prebuilds/${{ matrix.os }}-${{ matrix.arch }}
+          NODE_FILE=$(find build -name 'nativekit.node' -type f | head -1)
+          if [ -z "$NODE_FILE" ]; then
+            echo "nativekit.node not found" >&2
+            exit 1
+          fi
+          cp "$NODE_FILE" prebuilds/${{ matrix.os }}-${{ matrix.arch }}/nativekit.node
+
+      - name: Upload prebuild artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: prebuild-${{ matrix.os }}-${{ matrix.arch }}
+          path: prebuilds/${{ matrix.os }}-${{ matrix.arch }}/nativekit.node
+          if-no-files-found: error
+          retention-days: 7
+
+  # -------------------------------------------------------------------
+  # Phase 2: assemble all prebuilds, publish to npm, create GH release
+  # -------------------------------------------------------------------
+  publish:
+    name: Assemble & publish
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Download all prebuild artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: prebuild-*
+          path: prebuilds-tmp
+          merge-multiple: false
+
+      - name: Assemble prebuilds directory
+        run: |
+          mkdir -p prebuilds
+          for dir in prebuilds-tmp/prebuild-*; do
+            # artifact name format: prebuild-<os>-<arch>
+            name=$(basename "$dir")
+            os=$(echo "$name" | cut -d- -f2)
+            arch=$(echo "$name" | cut -d- -f3)
+            target="prebuilds/${os}-${arch}"
+            mkdir -p "$target"
+            cp "$dir/nativekit.node" "$target/nativekit.node"
+          done
+          find prebuilds -type f -name '*.node'
+
+      - name: Verify all expected prebuilds exist
+        run: |
+          for target in darwin-arm64 darwin-x64 win32-x64; do
+            if [ ! -f "prebuilds/${target}/nativekit.node" ]; then
+              echo "Missing prebuild: ${target}" >&2
+              exit 1
+            fi
+          done
+
+      - name: Set package version from tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF##*/}"
+          if [ -z "$TAG" ] || [ "$TAG" = "refs/tags" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          fi
+          VERSION="${TAG#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          # update package.json in-place
+          node -e "const p=require('./package.json'); p.version='${VERSION}'; require('fs').writeFileSync('./package.json', JSON.stringify(p,null,2)+'\n')"
+          echo "Publishing version ${VERSION}"
+
+      - name: Pack (dry-run, verify contents)
+        run: npm pack --dry-run
+
+      - name: Publish to npm
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            prebuilds/*/nativekit.node
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

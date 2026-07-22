@@ -1,0 +1,90 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: darwin
+            arch: arm64
+            runner: macos-14
+          - os: darwin
+            arch: x64
+            runner: macos-13
+          - os: win32
+            arch: x64
+            runner: windows-2022
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --ignore-scripts
+
+      # --- macOS deps ---
+      - name: Install macOS system deps
+        if: matrix.os == 'darwin'
+        run: |
+          brew install cmake
+          xcode-select -p || sudo xcode-select --install
+
+      # --- Windows deps ---
+      - name: Setup MSVC
+        if: matrix.os == 'win32'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.arch }}
+
+      - name: Install Windows CMake
+        if: matrix.os == 'win32'
+        run: choco install cmake -y --no-progress
+
+      - name: Build native addon (cmake-js)
+        run: pnpm exec cmake-js build --arch=${{ matrix.arch }}
+        env:
+          npm_config_runtime: node
+
+      - name: Prepare prebuild artifact
+        shell: bash
+        run: |
+          mkdir -p prebuilds/${{ matrix.os }}-${{ matrix.arch }}
+          # locate the built .node (cmake-js outputs under build/Release or build/)
+          NODE_FILE=$(find build -name 'nativekit.node' -type f | head -1)
+          if [ -z "$NODE_FILE" ]; then
+            echo "nativekit.node not found" >&2
+            exit 1
+          fi
+          cp "$NODE_FILE" prebuilds/${{ matrix.os }}-${{ matrix.arch }}/nativekit.node
+
+      - name: Upload prebuild artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: prebuild-${{ matrix.os }}-${{ matrix.arch }}
+          path: prebuilds/${{ matrix.os }}-${{ matrix.arch }}/nativekit.node
+          if-no-files-found: error
+          retention-days: 30
