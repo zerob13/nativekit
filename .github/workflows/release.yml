@@ -164,8 +164,6 @@ jobs:
 
       - name: Publish package
         run: npm publish "${{ steps.package.outputs.archive }}" --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
