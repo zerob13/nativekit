@@ -95,6 +95,23 @@ app.on('will-quit', () => overlay.stop())
 
 ---
 
+## Electron demo
+
+The workspace demo exercises every module through a context-isolated preload.
+Its smoke mode also starts and ends a native drag session with synthetic pointer
+input.
+
+```bash
+pnpm install
+pnpm demo
+pnpm demo:smoke
+```
+
+The interactive demo can choose installed apps and real files for manual icon
+and Finder / Explorer drag-out checks.
+
+---
+
 ## Modules
 
 | Module | Description | Status |

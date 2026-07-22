@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>nativekit demo</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main>
+      <header class="app-header">
+        <div>
+          <h1>nativekit demo</h1>
+          <p>Cross-platform native capabilities from the Electron main process.</p>
+        </div>
+        <output id="runtime" class="runtime">Starting…</output>
+      </header>
+
+      <div class="feature-grid">
+        <section aria-labelledby="windows-title">
+          <div class="section-heading">
+            <div>
+              <h2 id="windows-title">Window awareness</h2>
+              <p>Frontmost app and visible system windows.</p>
+            </div>
+            <button id="refresh-windows" type="button">Refresh</button>
+          </div>
+          <p id="frontmost" class="result-line">No snapshot yet.</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Application</th><th>Window</th></tr></thead>
+              <tbody id="window-list"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section aria-labelledby="overlay-title">
+          <div class="section-heading">
+            <div>
+              <h2 id="overlay-title">Overlay</h2>
+              <p>Native panel anchored outside this window.</p>
+            </div>
+          </div>
+          <div class="button-row">
+            <button id="show-overlay" type="button">Show sample</button>
+            <button id="hide-overlay" type="button" class="secondary">Hide</button>
+          </div>
+          <p id="overlay-state" class="result-line">Host is attached.</p>
+        </section>
+
+        <section aria-labelledby="worker-title">
+          <div class="section-heading">
+            <div>
+              <h2 id="worker-title">Worker channel</h2>
+              <p>Verified executable with framed stdout.</p>
+            </div>
+          </div>
+          <div class="button-row">
+            <button id="start-worker" type="button">Start worker</button>
+            <button id="stop-worker" type="button" class="secondary">Stop</button>
+          </div>
+          <p id="worker-state" class="result-line">Worker is stopped.</p>
+        </section>
+
+        <section aria-labelledby="icon-title">
+          <div class="section-heading">
+            <div>
+              <h2 id="icon-title">Application icon</h2>
+              <p>Extract a real icon from an installed app.</p>
+            </div>
+            <button id="pick-app" type="button">Choose app</button>
+          </div>
+          <div class="icon-result">
+            <img id="app-icon" alt="" width="32" height="32" />
+            <p id="app-name" class="result-line">No application selected.</p>
+          </div>
+        </section>
+      </div>
+
+      <section aria-labelledby="drag-title" class="drag-section">
+        <div class="section-heading">
+          <div>
+            <h2 id="drag-title">File drag-out</h2>
+            <p id="drag-help">Choose a file, then press and hold the drag handle while moving to Finder or Explorer.</p>
+          </div>
+          <button id="pick-file" type="button">Choose file</button>
+        </div>
+        <button
+          id="drag-handle"
+          type="button"
+          class="drag-handle"
+          aria-describedby="drag-help drag-file"
+          disabled
+        >
+          Drag selected file out
+        </button>
+        <p id="drag-file" class="result-line">No file selected.</p>
+      </section>
+
+      <section aria-labelledby="events-title" class="events-section">
+        <div class="section-heading">
+          <div>
+            <h2 id="events-title">Event log</h2>
+            <p>Native callbacks forwarded through the preload boundary.</p>
+          </div>
+          <button id="clear-events" type="button" class="secondary">Clear</button>
+        </div>
+        <ol id="events" aria-live="polite" aria-relevant="additions"></ol>
+      </section>
+
+      <output id="status" class="status" aria-live="polite">Ready.</output>
+    </main>
+    <script type="module" src="./renderer.mjs"></script>
+  </body>
+</html>

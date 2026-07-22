@@ -1,0 +1,16 @@
+{
+  "name": "@zerob13/nativekit-demo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "main.mjs",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "@zerob13/nativekit": "workspace:*"
+  },
+  "devDependencies": {
+    "electron": "^43.2.0"
+  }
+}

@@ -20,10 +20,12 @@
     "build:native": "cmake-js build",
     "build:mac": "cmake-js build --arch=arm64 && cmake-js build --arch=x64",
     "build:win": "cmake-js build --arch=x64",
-    "prebuild": "prebuildify --napi --strip",
+    "prebuilds": "prebuildify --napi --strip",
     "test": "vitest run",
     "check": "pnpm build:js && tsc --noEmit && vitest run",
-    "prepack": "pnpm build:js"
+    "prepack": "pnpm build:js",
+    "demo": "pnpm build && electron examples/electron",
+    "demo:smoke": "pnpm build && electron examples/electron --smoke"
   },
   "binary": {
     "napi_versions": [
