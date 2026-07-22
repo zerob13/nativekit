@@ -43,6 +43,7 @@ class FrameDecoder {
   }
 
   void reset() { buffer_.clear(); }
+  bool has_pending_data() const { return !buffer_.empty(); }
 
  private:
   std::vector<std::uint8_t> buffer_;

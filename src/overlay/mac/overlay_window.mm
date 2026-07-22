@@ -215,6 +215,23 @@ NSRect frame_for_presentation(
   return NSMakeRect(0, 0, size.width, size.height);
 }
 
+bool presentation_fits(
+    const OverlayHost& host,
+    NSSize size,
+    double cursor) {
+  NSScreen* screen = screen_for_host(host);
+  if (screen == nil) return false;
+  const NSSize available = screen.visibleFrame.size;
+  const double offset = host.anchor.offset;
+  if (host.anchor.edge == AnchorEdge::kLeading ||
+      host.anchor.edge == AnchorEdge::kTrailing) {
+    return offset + size.width <= available.width &&
+           offset + cursor + size.height <= available.height;
+  }
+  return offset + size.height <= available.height &&
+         offset + cursor + size.width <= available.width;
+}
+
 class MacOverlayPlatform final : public OverlayPlatform {
  public:
   explicit MacOverlayPlatform(OverlayPlatformEvents events)
@@ -288,17 +305,14 @@ class MacOverlayPlatform final : public OverlayPlatform {
 
       const NSSize size = fitted_size(image, host->second, snapshot.max_size);
       double& cursor = cursors[presentation.host_id];
-      const NSRect frame = frame_for_presentation(host->second, size, cursor);
-      const bool frame_changed = !NSEqualRects(panel.frame, frame);
-      [panel setFrame:frame
-              display:YES
-              animate:frame_changed && !created && host->second.animated];
-      cursor += (host->second.anchor.edge == AnchorEdge::kLeading ||
-                 host->second.anchor.edge == AnchorEdge::kTrailing)
-                    ? size.height + 12
-                    : size.width + 12;
-
-      if (presentation.visible && snapshot.visible) {
+      if (presentation.visible && snapshot.visible &&
+          presentation_fits(host->second, size, cursor)) {
+        const NSRect frame = frame_for_presentation(host->second, size, cursor);
+        [panel setFrame:frame display:YES animate:NO];
+        cursor += (host->second.anchor.edge == AnchorEdge::kLeading ||
+                   host->second.anchor.edge == AnchorEdge::kTrailing)
+                      ? size.height + 12
+                      : size.width + 12;
         // Visible panels are ordered after layout so the active session wins.
       } else {
         [panel orderOut:nil];

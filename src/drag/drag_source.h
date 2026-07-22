@@ -41,6 +41,6 @@ std::unique_ptr<DragPlatform> create_drag_platform(DragEvents events);
 }  // namespace platform
 
 void register_drag(Napi::Env env, Napi::Object& exports);
-void cleanup_drag();
+void cleanup_drag() noexcept;
 
 }  // namespace nativekit

@@ -68,6 +68,9 @@ std::optional<SystemWindow> parse_window(HWND handle, int level) {
   const std::wstring title = window_text(handle);
   DWORD cloaked = 0;
   DwmGetWindowAttribute(handle, DWMWA_CLOAKED, &cloaked, sizeof(cloaked));
+  const RECT monitor_bounds = rect;
+  const bool intersects_display =
+      MonitorFromRect(&monitor_bounds, MONITOR_DEFAULTTONULL) != nullptr;
 
   SystemWindow result;
   result.id = reinterpret_cast<std::uintptr_t>(handle);
@@ -83,7 +86,8 @@ std::optional<SystemWindow> parse_window(HWND handle, int level) {
   if (!path.empty()) {
     result.owner_name = utf8(std::filesystem::path(path).filename().wstring());
   }
-  result.is_onscreen = IsWindowVisible(handle) && cloaked == 0;
+  result.is_onscreen = IsWindowVisible(handle) && !IsIconic(handle) &&
+                       cloaked == 0 && intersects_display;
   return result;
 }
 

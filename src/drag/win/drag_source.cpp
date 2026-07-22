@@ -53,9 +53,9 @@ std::wstring utf8_to_utf16(const std::string& value) {
   return converted;
 }
 
-bool client_coordinate(double value, LONG* result) {
+bool client_coordinate(double value, double scale, LONG* result) {
   if (!std::isfinite(value)) return false;
-  const double rounded = std::round(value);
+  const double rounded = std::round(value * scale);
   if (rounded < std::numeric_limits<LONG>::min() ||
       rounded > std::numeric_limits<LONG>::max()) {
     return false;
@@ -66,6 +66,8 @@ bool client_coordinate(double value, LONG* result) {
 
 struct PreparedRequest {
   std::vector<std::wstring> files;
+  HWND window = nullptr;
+  POINT client_position{};
   POINT origin{};
 };
 
@@ -78,11 +80,14 @@ bool prepare_request(const DragRequest& request, PreparedRequest* prepared) {
     return false;
   }
 
+  const UINT dpi = GetDpiForWindow(window);
+  const double scale = static_cast<double>(dpi == 0 ? 96 : dpi) / 96.0;
   POINT client{};
-  if (!client_coordinate(request.position.x, &client.x) ||
-      !client_coordinate(request.position.y, &client.y)) {
+  if (!client_coordinate(request.position.x, scale, &client.x) ||
+      !client_coordinate(request.position.y, scale, &client.y)) {
     return false;
   }
+  const POINT client_position = client;
   RECT client_bounds{};
   if (!GetClientRect(window, &client_bounds) ||
       !PtInRect(&client_bounds, client) || !ClientToScreen(window, &client)) {
@@ -100,6 +105,8 @@ bool prepare_request(const DragRequest& request, PreparedRequest* prepared) {
     if (attributes == INVALID_FILE_ATTRIBUTES) return false;
     prepared->files.push_back(std::move(path));
   }
+  prepared->window = window;
+  prepared->client_position = client_position;
   prepared->origin = client;
   return true;
 }
@@ -404,6 +411,17 @@ class WindowsDragPlatform final : public DragPlatform {
       thread_id_ = GetCurrentThreadId();
     }
     initialized.set_value(true);
+
+    IDragSourceHelper* drag_helper = nullptr;
+    if (SUCCEEDED(CoCreateInstance(
+            CLSID_DragDropHelper,
+            nullptr,
+            CLSCTX_INPROC_SERVER,
+            IID_PPV_ARGS(&drag_helper)))) {
+      drag_helper->InitializeFromWindow(
+          prepared.window, &prepared.client_position, data_object);
+      drag_helper->Release();
+    }
 
     DWORD effect = DROPEFFECT_NONE;
     const HRESULT result = DoDragDrop(

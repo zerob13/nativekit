@@ -20,10 +20,16 @@ class DragManager {
 
   EventCallback& ended_callback() { return ended_callback_; }
 
-  void cleanup() {
-    if (platform_) platform_->stop();
+  void cleanup() noexcept {
+    try {
+      if (platform_) platform_->stop();
+    } catch (...) {
+    }
     platform_.reset();
-    ended_callback_.reset();
+    try {
+      ended_callback_.reset();
+    } catch (...) {
+    }
   }
 
  private:
@@ -138,7 +144,7 @@ void register_drag(Napi::Env env, Napi::Object& exports) {
   exports.Set("dragOnEnded", Napi::Function::New(env, set_ended_callback));
 }
 
-void cleanup_drag() {
+void cleanup_drag() noexcept {
   manager.cleanup();
 }
 

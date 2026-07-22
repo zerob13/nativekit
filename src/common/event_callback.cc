@@ -28,18 +28,25 @@ void call_javascript(
         } else if constexpr (std::is_same_v<Value, std::vector<std::uint8_t>>) {
           callback.Call({Napi::Buffer<std::uint8_t>::Copy(
               env, value.data(), value.size())});
-        } else if constexpr (std::is_same_v<Value, CursorEvent>) {
-          Napi::Object result = Napi::Object::New(env);
-          result.Set("x", value.x);
-          result.Set("y", value.y);
-          result.Set("active", value.active);
-          callback.Call({result});
         } else if constexpr (std::is_same_v<Value, DragEndedEvent>) {
           Napi::Object result = Napi::Object::New(env);
           result.Set("dropped", value.dropped);
           result.Set("x", value.x);
           result.Set("y", value.y);
           callback.Call({result});
+        } else if constexpr (std::is_same_v<Value, SecureChannelEvent>) {
+          if (value.type == SecureChannelEventType::kData) {
+            callback.Call({
+                Napi::String::New(env, "data"),
+                Napi::Buffer<std::uint8_t>::Copy(
+                    env, value.data.data(), value.data.size()),
+            });
+          } else {
+            callback.Call({
+                Napi::String::New(env, "exit"),
+                Napi::Number::New(env, value.exit_code),
+            });
+          }
         }
       },
       *owned);

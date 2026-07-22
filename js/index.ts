@@ -27,7 +27,6 @@ export interface HostConfig {
   bounds: Rect
   windowHandle: Buffer
   anchor: AnchorConfig
-  animated?: boolean
 }
 
 export interface ImageFrame {
@@ -91,7 +90,6 @@ interface NativeBinding {
   overlayOnMaxSizeChanged?(callback: (size: number) => void): void
   overlayOnActivate?(callback: () => void): void
   overlayOnVisibilityRequest?(callback: (visible: boolean) => void): void
-  overlayOnCursor?(callback: (position: Point & { active: boolean }) => void): void
 
   windowsFrontmost(): FrontmostWindow | null
   windowsList(relativeTo: number): SystemWindow[]
@@ -101,14 +99,20 @@ interface NativeBinding {
   secureChannelSpawn(executablePath: string, arguments_: string[]): number | null
   secureChannelVerify(pid: number, executablePath: string): boolean
   secureChannelTerminate(): boolean
-  secureChannelWasTerminatedByPrivacy(): boolean
-  secureChannelOnData?(callback: (payload: Buffer) => void): void
-  secureChannelOnExit?(callback: (code: number) => void): void
+  secureChannelOnEvent?(
+    callback: (type: 'data' | 'exit', payload: Buffer | number) => void,
+  ): void
 
   appsIcon(appPath: string, size: 'small' | 'medium'): string | null
 
   dragStart(config: DragConfig): boolean
   dragOnEnded?(callback: (result: DragResult) => void): void
+}
+
+interface ElectronScreen {
+  dipToScreenPoint(point: Point): Point
+  screenToDipPoint(point: Point): Point
+  screenToDipRect(window: null, rect: Rect): Rect
 }
 
 const modulePath =
@@ -175,9 +179,6 @@ class Overlay extends EventEmitter {
       )
     }
     requireNonNegative(config.anchor.offset, 'config.anchor.offset')
-    if (config.animated !== undefined && typeof config.animated !== 'boolean') {
-      throw new TypeError('config.animated must be a boolean')
-    }
     return native.overlayAttachHost(config)
   }
 
@@ -278,13 +279,19 @@ class Windows {
     if (options.relativeTo !== undefined) {
       requireWindowId(options.relativeTo, 'options.relativeTo')
     }
-    return Promise.resolve(native.windowsList(options.relativeTo ?? 0))
+    return Promise.resolve(
+      native
+        .windowsList(options.relativeTo ?? 0)
+        .map(windowFromNativeCoordinates),
+    )
   }
 
   find(id: number): Promise<SystemWindow | null> {
     assertMainProcess()
     requireWindowId(id, 'id')
-    return Promise.resolve(native.windowsFind(id))
+    return Promise.resolve(
+      nullableWindowFromNativeCoordinates(native.windowsFind(id)),
+    )
   }
 
   atPoint(
@@ -296,7 +303,14 @@ class Windows {
     if (options.belowId !== undefined) {
       requireWindowId(options.belowId, 'options.belowId')
     }
-    return Promise.resolve(native.windowsAtPoint(point, options.belowId ?? 0))
+    return Promise.resolve(
+      nullableWindowFromNativeCoordinates(
+        native.windowsAtPoint(
+          pointToNativeScreenCoordinates(point),
+          options.belowId ?? 0,
+        ),
+      ),
+    )
   }
 }
 
@@ -330,12 +344,6 @@ class SecureChannel extends EventEmitter {
   terminate(): boolean {
     assertMainProcess()
     return native.secureChannelTerminate()
-  }
-
-  /** @deprecated Generic process exit status cannot identify privacy denial. */
-  wasTerminatedByPrivacy(): boolean {
-    assertMainProcess()
-    return native.secureChannelWasTerminatedByPrivacy()
   }
 }
 
@@ -399,14 +407,44 @@ native.overlayOnActivate?.(() => overlay.emit('activate'))
 native.overlayOnVisibilityRequest?.((visible) =>
   overlay.emit('visibilityRequest', visible),
 )
-native.overlayOnCursor?.((position) => overlay.emit('cursor', position))
-native.secureChannelOnData?.((payload) =>
-  secureChannel.emit('data', payload),
+native.secureChannelOnEvent?.((type, payload) => {
+  secureChannel.emit(type, payload)
+})
+native.dragOnEnded?.((result) =>
+  drag.emit('ended', dragResultFromNativeCoordinates(result)),
 )
-native.secureChannelOnExit?.((code) => secureChannel.emit('exit', code))
-native.dragOnEnded?.((result) => drag.emit('ended', result))
 
 export default { overlay, windows, secureChannel, apps, drag }
+
+function electronScreen(): ElectronScreen | null {
+  if (process.platform !== 'win32' || !process.versions.electron) return null
+  const electron = require('electron') as { screen?: ElectronScreen }
+  return electron.screen ?? null
+}
+
+function pointToNativeScreenCoordinates(point: Point): Point {
+  return electronScreen()?.dipToScreenPoint(point) ?? point
+}
+
+function windowFromNativeCoordinates(window: SystemWindow): SystemWindow {
+  const screen = electronScreen()
+  return screen === null
+    ? window
+    : { ...window, bounds: screen.screenToDipRect(null, window.bounds) }
+}
+
+function nullableWindowFromNativeCoordinates(
+  window: SystemWindow | null,
+): SystemWindow | null {
+  return window === null ? null : windowFromNativeCoordinates(window)
+}
+
+function dragResultFromNativeCoordinates(result: DragResult): DragResult {
+  const screen = electronScreen()
+  if (screen === null) return result
+  const point = screen.screenToDipPoint(result)
+  return { ...point, dropped: result.dropped }
+}
 
 function validateOverlayOptions(options: OverlayOptions): void {
   requireRecord(options, 'options')

@@ -10,16 +10,21 @@
 
 namespace nativekit {
 
-struct CursorEvent {
-  double x = 0;
-  double y = 0;
-  bool active = false;
-};
-
 struct DragEndedEvent {
   bool dropped = false;
   double x = 0;
   double y = 0;
+};
+
+enum class SecureChannelEventType {
+  kData,
+  kExit,
+};
+
+struct SecureChannelEvent {
+  SecureChannelEventType type = SecureChannelEventType::kData;
+  std::vector<std::uint8_t> data;
+  std::int32_t exit_code = 0;
 };
 
 using EventPayload = std::variant<
@@ -29,8 +34,8 @@ using EventPayload = std::variant<
     std::int32_t,
     std::string,
     std::vector<std::uint8_t>,
-    CursorEvent,
-    DragEndedEvent>;
+    DragEndedEvent,
+    SecureChannelEvent>;
 
 class EventCallback {
  public:

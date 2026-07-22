@@ -9,11 +9,12 @@
 #include <string>
 #include <vector>
 
+#include "common/event_callback.h"
+
 namespace nativekit {
 
 struct SecureChannelEvents {
-  std::function<void(std::vector<std::uint8_t>)> data;
-  std::function<void(std::int32_t)> exit;
+  std::function<void(SecureChannelEvent)> emit;
 };
 
 class SecureChannelPlatform {
@@ -25,6 +26,7 @@ class SecureChannelPlatform {
   virtual bool verify(
       std::uint32_t pid,
       const std::string& executable_path) const = 0;
+  virtual bool active() const = 0;
   virtual void stop() = 0;
 };
 
@@ -36,6 +38,6 @@ std::unique_ptr<SecureChannelPlatform> create_secure_channel_platform(
 }  // namespace platform
 
 void register_secure_channel(Napi::Env env, Napi::Object& exports);
-void cleanup_secure_channel();
+void cleanup_secure_channel() noexcept;
 
 }  // namespace nativekit

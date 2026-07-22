@@ -16,7 +16,7 @@ Napi::Object init(Napi::Env env, Napi::Object exports) {
   register_drag(env, exports);
   napi_add_env_cleanup_hook(
       env,
-      [](void*) {
+      [](void*) noexcept {
         cleanup_drag();
         cleanup_secure_channel();
         cleanup_overlay();

@@ -77,6 +77,7 @@ std::optional<std::string> icon_to_png_data_url(
 
   ComPtr<IWICImagingFactory> factory;
   ComPtr<IWICBitmap> bitmap;
+  ComPtr<IWICBitmapScaler> scaler;
   ComPtr<IWICFormatConverter> converter;
   ComPtr<IStream> stream;
   ComPtr<IWICBitmapEncoder> encoder;
@@ -89,10 +90,18 @@ std::optional<std::string> icon_to_png_data_url(
       CLSCTX_INPROC_SERVER,
       IID_PPV_ARGS(&factory));
   if (SUCCEEDED(result)) result = factory->CreateBitmapFromHICON(file_info.hIcon, &bitmap);
+  if (SUCCEEDED(result)) result = factory->CreateBitmapScaler(&scaler);
+  if (SUCCEEDED(result)) {
+    result = scaler->Initialize(
+        bitmap.Get(),
+        static_cast<UINT>(pixels),
+        static_cast<UINT>(pixels),
+        WICBitmapInterpolationModeFant);
+  }
   if (SUCCEEDED(result)) result = factory->CreateFormatConverter(&converter);
   if (SUCCEEDED(result)) {
     result = converter->Initialize(
-        bitmap.Get(),
+        scaler.Get(),
         GUID_WICPixelFormat32bppBGRA,
         WICBitmapDitherTypeNone,
         nullptr,
@@ -107,10 +116,10 @@ std::optional<std::string> icon_to_png_data_url(
   if (SUCCEEDED(result)) result = encoder->CreateNewFrame(&frame, &properties);
   if (SUCCEEDED(result)) result = frame->Initialize(properties.Get());
 
-  UINT width = 0;
-  UINT height = 0;
-  if (SUCCEEDED(result)) result = converter->GetSize(&width, &height);
-  if (SUCCEEDED(result)) result = frame->SetSize(width, height);
+  if (SUCCEEDED(result)) {
+    result = frame->SetSize(
+        static_cast<UINT>(pixels), static_cast<UINT>(pixels));
+  }
   WICPixelFormatGUID pixel_format = GUID_WICPixelFormat32bppBGRA;
   if (SUCCEEDED(result)) result = frame->SetPixelFormat(&pixel_format);
   if (SUCCEEDED(result)) result = frame->WriteSource(converter.Get(), nullptr);

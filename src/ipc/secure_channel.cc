@@ -25,35 +25,39 @@ class SecureChannelManager {
   }
 
   bool terminate() {
-    if (!platform_) return false;
+    if (!platform_ || !platform_->active()) return false;
     platform_->stop();
     platform_.reset();
     return true;
   }
 
-  EventCallback& data_callback() { return data_callback_; }
-  EventCallback& exit_callback() { return exit_callback_; }
+  EventCallback& event_callback() { return event_callback_; }
 
-  void cleanup() {
-    terminate();
-    data_callback_.reset();
-    exit_callback_.reset();
+  void cleanup() noexcept {
+    try {
+      if (platform_) platform_->stop();
+      platform_.reset();
+    } catch (...) {
+      (void)platform_.release();
+    }
+    try {
+      event_callback_.reset();
+    } catch (...) {
+    }
   }
 
  private:
   void ensure_platform() {
     if (platform_) return;
     platform_ = platform::create_secure_channel_platform({
-        [this](std::vector<std::uint8_t> data) {
-          data_callback_.emit(std::move(data));
+        [this](SecureChannelEvent event) {
+          event_callback_.emit(std::move(event));
         },
-        [this](std::int32_t code) { exit_callback_.emit(code); },
     });
   }
 
   std::unique_ptr<SecureChannelPlatform> platform_;
-  EventCallback data_callback_;
-  EventCallback exit_callback_;
+  EventCallback event_callback_;
 };
 
 SecureChannelManager manager;
@@ -132,10 +136,6 @@ Napi::Value terminate(const Napi::CallbackInfo& info) {
   }
 }
 
-Napi::Value was_terminated_by_privacy(const Napi::CallbackInfo& info) {
-  return Napi::Boolean::New(info.Env(), false);
-}
-
 template <EventCallback& (SecureChannelManager::*Getter)()>
 Napi::Value set_callback(const Napi::CallbackInfo& info, const char* name) {
   try {
@@ -153,27 +153,16 @@ void register_secure_channel(Napi::Env env, Napi::Object& exports) {
   exports.Set("secureChannelVerify", Napi::Function::New(env, verify));
   exports.Set("secureChannelTerminate", Napi::Function::New(env, terminate));
   exports.Set(
-      "secureChannelWasTerminatedByPrivacy",
-      Napi::Function::New(env, was_terminated_by_privacy));
-  exports.Set(
-      "secureChannelOnData",
+      "secureChannelOnEvent",
       Napi::Function::New(
           env,
           [](const Napi::CallbackInfo& info) {
-            return set_callback<&SecureChannelManager::data_callback>(
-                info, "nativekit.secureChannel.data");
-          }));
-  exports.Set(
-      "secureChannelOnExit",
-      Napi::Function::New(
-          env,
-          [](const Napi::CallbackInfo& info) {
-            return set_callback<&SecureChannelManager::exit_callback>(
-                info, "nativekit.secureChannel.exit");
+            return set_callback<&SecureChannelManager::event_callback>(
+                info, "nativekit.secureChannel.event");
           }));
 }
 
-void cleanup_secure_channel() {
+void cleanup_secure_channel() noexcept {
   manager.cleanup();
 }
 

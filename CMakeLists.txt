@@ -105,6 +105,7 @@ if(WIN32)
   )
   target_link_libraries(nativekit PRIVATE
     advapi32
+    comctl32
     crypt32
     dwmapi
     gdi32

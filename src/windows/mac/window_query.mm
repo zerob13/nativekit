@@ -4,6 +4,7 @@
 #include "windows/window_query.h"
 
 #include <algorithm>
+#include <iterator>
 #include <string>
 #include <type_traits>
 
@@ -69,7 +70,8 @@ std::optional<SystemWindow> parse_window(CFDictionaryRef dictionary) {
 
 std::vector<SystemWindow> copy_windows(
     CGWindowListOption option,
-    CGWindowID relative_to) {
+    CGWindowID relative_to,
+    bool normalize_levels = true) {
   CFArrayRef descriptions =
       CGWindowListCopyWindowInfo(option, relative_to);
   if (descriptions == nullptr) return {};
@@ -79,7 +81,12 @@ std::vector<SystemWindow> copy_windows(
   for (CFIndex index = 0; index < CFArrayGetCount(descriptions); ++index) {
     CFDictionaryRef dictionary = (CFDictionaryRef)CFArrayGetValueAtIndex(
         descriptions, index);
-    if (const auto window = parse_window(dictionary)) windows.push_back(*window);
+    if (auto window = parse_window(dictionary)) {
+      if (normalize_levels) {
+        window->level = static_cast<int>(windows.size());
+      }
+      windows.push_back(std::move(*window));
+    }
   }
   CFRelease(descriptions);
   return windows;
@@ -101,7 +108,10 @@ std::optional<FrontmostWindow> frontmost_window() {
     result.icon = image_to_png_data_url(application.icon, 32);
 
     const pid_t pid = application.processIdentifier;
-    const auto windows = list_windows(0);
+    const auto windows = copy_windows(
+        kCGWindowListOptionAll | kCGWindowListExcludeDesktopElements,
+        kCGNullWindowID,
+        false);
     const auto match = std::find_if(
         windows.begin(), windows.end(), [pid](const SystemWindow& window) {
           return window.owner_pid == static_cast<std::uint32_t>(pid) &&
@@ -114,24 +124,25 @@ std::optional<FrontmostWindow> frontmost_window() {
 
 std::vector<SystemWindow> list_windows(WindowId relative_to) {
   @autoreleasepool {
-    if (relative_to != 0) {
-      return copy_windows(
-          kCGWindowListOptionOnScreenBelowWindow |
-              kCGWindowListExcludeDesktopElements,
-          static_cast<CGWindowID>(relative_to));
-    }
-    return copy_windows(
+    auto windows = copy_windows(
         kCGWindowListOptionAll | kCGWindowListExcludeDesktopElements,
         kCGNullWindowID);
+    if (relative_to == 0) return windows;
+    const auto reference = std::find_if(
+        windows.begin(), windows.end(), [relative_to](const SystemWindow& window) {
+          return window.id == relative_to;
+        });
+    if (reference == windows.end()) return {};
+    windows.erase(windows.begin(), std::next(reference));
+    return windows;
   }
 }
 
 std::optional<SystemWindow> find_window(WindowId id) {
   @autoreleasepool {
     const auto windows = copy_windows(
-        kCGWindowListOptionIncludingWindow |
-            kCGWindowListExcludeDesktopElements,
-        static_cast<CGWindowID>(id));
+        kCGWindowListOptionAll | kCGWindowListExcludeDesktopElements,
+        kCGNullWindowID);
     const auto match = std::find_if(
         windows.begin(), windows.end(), [id](const SystemWindow& window) {
           return window.id == id;

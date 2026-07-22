@@ -3,6 +3,7 @@
 #include <windows.h>
 
 #include <array>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -309,8 +310,7 @@ class WindowsSecureChannelPlatform final : public SecureChannelPlatform {
     if (!job.valid()) return std::nullopt;
     JOBOBJECT_EXTENDED_LIMIT_INFORMATION job_limits{};
     job_limits.BasicLimitInformation.LimitFlags =
-        JOB_OBJECT_LIMIT_ACTIVE_PROCESS | JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-    job_limits.BasicLimitInformation.ActiveProcessLimit = 1;
+        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
     if (!SetInformationJobObject(
             job.get(),
             JobObjectExtendedLimitInformation,
@@ -371,6 +371,7 @@ class WindowsSecureChannelPlatform final : public SecureChannelPlatform {
       process_ = process.release();
       job_ = job.release();
       read_pipe_ = read_pipe.release();
+      channel_error_.store(false);
     }
 
     try {
@@ -402,6 +403,11 @@ class WindowsSecureChannelPlatform final : public SecureChannelPlatform {
     if (expected.empty()) return false;
     Handle process(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid));
     return process.valid() && verify_process(process.get(), expected);
+  }
+
+  bool active() const override {
+    std::lock_guard lock(state_mutex_);
+    return pid_ != 0;
   }
 
   void stop() override {
@@ -462,17 +468,22 @@ class WindowsSecureChannelPlatform final : public SecureChannelPlatform {
   }
 
   void join_threads() {
-    if (reader_thread_.joinable() &&
-        reader_thread_.get_id() != std::this_thread::get_id()) {
-      reader_thread_.join();
-    }
     if (wait_thread_.joinable() &&
         wait_thread_.get_id() != std::this_thread::get_id()) {
       wait_thread_.join();
     }
+    join_reader_thread();
+  }
+
+  void join_reader_thread() {
+    if (reader_thread_.joinable() &&
+        reader_thread_.get_id() != std::this_thread::get_id()) {
+      reader_thread_.join();
+    }
   }
 
   void terminate_for_channel_error(std::uint32_t child_pid) {
+    channel_error_.store(true);
     std::lock_guard lock(state_mutex_);
     if (pid_ == child_pid && job_ != nullptr) {
       TerminateJobObject(job_, ERROR_INVALID_DATA);
@@ -498,10 +509,19 @@ class WindowsSecureChannelPlatform final : public SecureChannelPlatform {
         }
         if (count == 0) break;
         for (auto& frame : decoder.push(buffer.data(), count)) {
-          if (events_.data) events_.data(std::move(frame));
+          if (events_.emit) {
+            events_.emit({
+                SecureChannelEventType::kData,
+                std::move(frame),
+                0,
+            });
+          }
         }
       }
     } catch (...) {
+      terminate_for_channel_error(child_pid);
+    }
+    if (decoder.has_pending_data()) {
       terminate_for_channel_error(child_pid);
     }
 
@@ -520,9 +540,19 @@ class WindowsSecureChannelPlatform final : public SecureChannelPlatform {
     }
     {
       std::lock_guard lock(state_mutex_);
+      if (pid_ == child_pid && job_ != nullptr) {
+        TerminateJobObject(job_, ERROR_PROCESS_ABORTED);
+      }
+    }
+    join_reader_thread();
+    if (channel_error_.load()) exit_code = -1;
+    if (events_.emit) {
+      events_.emit({SecureChannelEventType::kExit, {}, exit_code});
+    }
+    {
+      std::lock_guard lock(state_mutex_);
       if (pid_ == child_pid) pid_ = 0;
     }
-    if (events_.exit) events_.exit(exit_code);
   }
 
   SecureChannelEvents events_;
@@ -532,6 +562,7 @@ class WindowsSecureChannelPlatform final : public SecureChannelPlatform {
   HANDLE process_ = nullptr;
   HANDLE job_ = nullptr;
   HANDLE read_pipe_ = nullptr;
+  std::atomic<bool> channel_error_ = false;
   std::thread reader_thread_;
   std::thread wait_thread_;
 };

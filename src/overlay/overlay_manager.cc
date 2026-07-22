@@ -208,13 +208,36 @@ class OverlayManager {
             "presentationId cannot move between hosts or sessions");
       }
       presentation.order = existing->second.order;
+      OverlayPresentation previous = existing->second;
       existing->second = std::move(presentation);
+      try {
+        sync();
+      } catch (...) {
+        existing->second = std::move(previous);
+        try {
+          sync();
+        } catch (...) {
+        }
+        throw;
+      }
     } else {
       presentation.order = next_order_++;
       presentation_order_.push_back(presentation.id);
-      presentations_.emplace(presentation.id, std::move(presentation));
+      const std::string id = presentation.id;
+      presentations_.emplace(id, std::move(presentation));
+      try {
+        sync();
+      } catch (...) {
+        presentations_.erase(id);
+        presentation_order_.pop_back();
+        --next_order_;
+        try {
+          sync();
+        } catch (...) {
+        }
+        throw;
+      }
     }
-    sync();
     return true;
   }
 
@@ -289,13 +312,10 @@ class OverlayManager {
   EventCallback& max_size_callback() { return max_size_callback_; }
   EventCallback& activate_callback() { return activate_callback_; }
   EventCallback& visibility_callback() { return visibility_callback_; }
-  EventCallback& cursor_callback() { return cursor_callback_; }
-
   void reset_callbacks() {
     max_size_callback_.reset();
     activate_callback_.reset();
     visibility_callback_.reset();
-    cursor_callback_.reset();
     visibility_dispatcher_.reset();
     relocate_dispatcher_.reset();
   }
@@ -385,7 +405,6 @@ class OverlayManager {
   EventCallback max_size_callback_;
   EventCallback activate_callback_;
   EventCallback visibility_callback_;
-  EventCallback cursor_callback_;
   EventCallback visibility_dispatcher_;
   EventCallback relocate_dispatcher_;
 };
@@ -441,13 +460,6 @@ Napi::Value attach_host(const Napi::CallbackInfo& info) {
     host.bounds = parse_rect(config.Get("bounds"));
     host.window_handle = parse_window_handle(config.Get("windowHandle"));
     host.anchor = parse_anchor(config.Get("anchor"));
-    const Napi::Value animated = config.Get("animated");
-    if (!animated.IsUndefined()) {
-      if (!animated.IsBoolean()) {
-        throw std::invalid_argument("animated must be a boolean");
-      }
-      host.animated = animated.As<Napi::Boolean>();
-    }
     return manager.attach_host(std::move(host));
   });
 }
@@ -621,19 +633,17 @@ void register_overlay(Napi::Env env, Napi::Object& exports) {
             return set_callback<&OverlayManager::visibility_callback>(
                 info, "nativekit.overlay.visibilityRequest");
           }));
-  exports.Set(
-      "overlayOnCursor",
-      Napi::Function::New(
-          env,
-          [](const Napi::CallbackInfo& info) {
-            return set_callback<&OverlayManager::cursor_callback>(
-                info, "nativekit.overlay.cursor");
-          }));
 }
 
-void cleanup_overlay() {
-  manager.stop();
-  manager.reset_callbacks();
+void cleanup_overlay() noexcept {
+  try {
+    manager.stop();
+  } catch (...) {
+  }
+  try {
+    manager.reset_callbacks();
+  } catch (...) {
+  }
 }
 
 }  // namespace nativekit

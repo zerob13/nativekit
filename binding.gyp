@@ -62,6 +62,7 @@
           ],
           "libraries": [
             "advapi32.lib",
+            "comctl32.lib",
             "crypt32.lib",
             "dwmapi.lib",
             "gdi32.lib",

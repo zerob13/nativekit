@@ -26,7 +26,6 @@ struct OverlayHost {
   Rect bounds;
   std::uintptr_t window_handle = 0;
   Anchor anchor;
-  bool animated = true;
 };
 
 struct OverlayPresentation {
@@ -73,6 +72,6 @@ std::unique_ptr<OverlayPlatform> create_overlay_platform(
 }  // namespace platform
 
 void register_overlay(Napi::Env env, Napi::Object& exports);
-void cleanup_overlay();
+void cleanup_overlay() noexcept;
 
 }  // namespace nativekit

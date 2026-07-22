@@ -66,7 +66,6 @@ function attachOverlayHost() {
     bounds: mainWindow.getContentBounds(),
     windowHandle: mainWindow.getNativeWindowHandle(),
     anchor: { edge: 'trailing', offset: 24 },
-    animated: true,
   })
 }
 

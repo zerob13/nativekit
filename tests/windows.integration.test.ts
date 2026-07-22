@@ -101,8 +101,7 @@ describe('secure channel integration', () => {
     expect(await secureChannel.spawn(process.execPath, [workerPath])).toBeNull()
     await expect(data).resolves.toEqual(Buffer.from('nativekit-worker'))
     await expect(exit).resolves.toBe(0)
-    expect(secureChannel.terminate()).toBe(true)
-    expect(secureChannel.wasTerminatedByPrivacy()).toBe(false)
+    expect(secureChannel.terminate()).toBe(false)
   })
 
   it('terminates an active worker', async () => {
@@ -119,6 +118,49 @@ describe('secure channel integration', () => {
     await data
     expect(secureChannel.terminate()).toBe(true)
     await expect(exit).resolves.toEqual(expect.any(Number))
+  })
+
+  it('delivers every decoded frame before exit', async () => {
+    const events: string[] = []
+    const onData = (payload: Buffer): void => {
+      events.push(payload.toString('utf8'))
+    }
+    secureChannel.on('data', onData)
+    const exit = new Promise<number>((resolvePromise) => {
+      secureChannel.once('exit', (code) => {
+        events.push(`exit:${code}`)
+        resolvePromise(code)
+      })
+    })
+
+    expect(
+      await secureChannel.spawn(process.execPath, [workerPath, '--burst']),
+    ).not.toBeNull()
+    await expect(exit).resolves.toBe(0)
+    secureChannel.off('data', onData)
+    expect(events).toEqual([
+      ...Array.from({ length: 64 }, (_, index) => `frame-${index}`),
+      'exit:0',
+    ])
+  })
+
+  it('reports a truncated final frame as a channel error', async () => {
+    const frames: Buffer[] = []
+    const onData = (payload: Buffer): void => {
+      frames.push(payload)
+    }
+    secureChannel.on('data', onData)
+    const exit = new Promise<number>((resolvePromise) => {
+      secureChannel.once('exit', resolvePromise)
+    })
+
+    expect(
+      await secureChannel.spawn(process.execPath, [workerPath, '--truncated']),
+    ).not.toBeNull()
+    await expect(exit).resolves.toBe(-1)
+    secureChannel.off('data', onData)
+    expect(frames).toEqual([])
+    expect(secureChannel.terminate()).toBe(false)
   })
 })
 
