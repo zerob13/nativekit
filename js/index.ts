@@ -414,7 +414,8 @@ function requireBuffer(value: unknown, name: string): asserts value is Buffer {
   traceNative('js:buffer:length-start')
   const byteLength = isBuffer ? value.byteLength : 0
   traceNative('js:buffer:length-ready')
-  if (!isBuffer || byteLength !== 8) {
+  const expectedByteLength = process.platform === 'linux' ? 4 : 8
+  if (!isBuffer || byteLength !== expectedByteLength) {
     throw new TypeError(
       `${name} must be the Buffer returned by getNativeWindowHandle()`,
     )
