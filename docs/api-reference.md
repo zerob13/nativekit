@@ -5,7 +5,7 @@ code should call a narrow, context-isolated preload API instead of importing the
 package directly.
 
 ```ts
-import { apps, drag, overlay, windows } from '@zerob13/nativekit'
+import { apps, overlay, windows } from '@zerob13/nativekit'
 ```
 
 Promise-returning methods currently wrap synchronous native results or native
@@ -250,47 +250,3 @@ read. `small` is 16×16 and `medium` is 32×32.
 ```ts
 const icon = await apps.icon('/Applications/Safari.app', { size: 'medium' })
 ```
-
-## `drag`
-
-### Types
-
-```ts
-interface DragConfig {
-  files: string[]
-  windowHandle: Buffer
-  position: Point
-}
-
-interface DragResult extends Point {
-  dropped: boolean
-}
-```
-
-#### `drag.start(config: DragConfig): Promise<void>`
-
-Begin one copy-only native file drag. Every path must be absolute and exist.
-`windowHandle` comes from the source BrowserWindow. `position` is a DIP point
-inside that window's content area.
-
-Call this method synchronously from a primary `pointerdown`/mouse-down handler;
-the OS drag loop expects the button to remain pressed when it begins. The
-promise resolves on either drop or cancel and rejects if validation or native
-startup fails. A second concurrent drag rejects.
-
-```ts
-element.addEventListener('pointerdown', async (event) => {
-  if (event.button !== 0 || !event.isPrimary) return
-  await drag.start({
-    files: ['/absolute/path/report.pdf'],
-    windowHandle: win.getNativeWindowHandle(),
-    position: { x: event.clientX, y: event.clientY },
-  })
-})
-```
-
-### Events
-
-| Event | Listener | Meaning |
-|---|---|---|
-| `ended` | `(result: DragResult) => void` | Drop/cancel result and final top-left-origin screen DIP point. |

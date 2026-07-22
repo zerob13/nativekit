@@ -18,7 +18,7 @@ describe('published entry points', () => {
       ],
       { encoding: 'utf8' },
     )
-    expect(output).toBe('apps,drag,overlay,windows')
+    expect(output).toBe('apps,overlay,windows')
   })
 
   it('loads the CommonJS bundle', () => {
@@ -31,6 +31,20 @@ describe('published entry points', () => {
       ],
       { encoding: 'utf8' },
     )
-    expect(output).toBe('apps,drag,overlay,windows')
+    expect(output).toBe('apps,overlay,windows')
+  })
+
+  it('rejects an Electron runtime without BrowserWindow', () => {
+    const entry = resolve(root, 'dist/index.cjs')
+    expect(() =>
+      execFileSync(
+        process.execPath,
+        [
+          '--eval',
+          `Object.defineProperty(process.versions, 'electron', { value: '28.0.0' }); process.type = 'browser'; require(${JSON.stringify(entry)})`,
+        ],
+        { encoding: 'utf8', stdio: 'pipe' },
+      ),
+    ).toThrow('nativekit must run in the Electron main process')
   })
 })

@@ -8,18 +8,11 @@
 
 namespace nativekit {
 
-struct DragEndedEvent {
-  bool dropped = false;
-  double x = 0;
-  double y = 0;
-};
-
 using EventPayload = std::variant<
     std::monostate,
     bool,
     double,
-    std::string,
-    DragEndedEvent>;
+    std::string>;
 
 class EventCallback {
  public:

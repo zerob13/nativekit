@@ -6,12 +6,12 @@ Guide for AI agents (and humans) working on `nativekit`.
 
 `nativekit` is a cross-platform N-API native addon (C++) that gives Electron
 desktop apps OS-level capabilities: floating overlays, native window awareness,
-app icon extraction, and file drag-out.
+and app icon extraction.
 
 - **Platforms**: macOS (arm64, x64), Windows (x64)
 - **Binding**: C++ via `node-addon-api` (N-API v8)
 - **Native tails**: macOS uses Objective-C++ (`.mm`) calling AppKit / CoreGraphics;
-  Windows uses C++ (`.cpp`) calling Win32 / Shell / OLE.
+  Windows uses C++ (`.cpp`) calling Win32 / Shell.
 - **Build**: CMake + `cmake-js` (primary), `binding.gyp` / `node-gyp` (fallback)
 - **Distribution**: prebuilt `.node` binaries via `prebuildify`, resolved at
   runtime by `node-gyp-build`. Published to npm.
@@ -27,8 +27,6 @@ src/
   windows/                    # system window query
     mac/*.mm  win/*.cpp
   apps/                       # app icon extraction
-    mac/*.mm  win/*.cpp
-  drag/                       # native file drag-out
     mac/*.mm  win/*.cpp
 js/
   index.ts                    # TS wrapper: platform guard, validation, types
@@ -50,8 +48,8 @@ binding.gyp
   thread directly — always marshal via `ThreadSafeFunction`.
 - **macOS**: Objective-C++ (`.mm`). Prefer AppKit / CoreGraphics. Use ARC unless
   integrating with a framework that forbids it.
-- **Windows**: C++ with `windows.h`, Shell API (`shellapi.h`), and OLE
-  (`ole2.h`) for drag-drop. Target Windows 10 1809+.
+- **Windows**: C++ with `windows.h`, DWM, Shell API, and WIC. Target Windows 10
+  1809+.
 - **Object lifetime**: `Napi::ObjectWrap` owns native handles; destructors
   release them. Never leak `NSWindow*` / `HWND`.
 - **Error handling**: throw `Napi::Error` for JS-visible failures; never return
@@ -62,7 +60,7 @@ binding.gyp
 - **C++**: `snake_case` for files, functions, variables; `PascalCase` for
   classes/structs.
 - **JS/TS API**: camelCase methods, PascalCase types. Module names are
-  lowercase single words (`overlay`, `windows`, `apps`, `drag`).
+  lowercase single words (`overlay`, `windows`, `apps`).
 
 ### JS wrapper (`js/index.ts`)
 

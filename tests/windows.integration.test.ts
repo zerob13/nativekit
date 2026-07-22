@@ -4,13 +4,10 @@ import { describe, expect, it } from 'vitest'
 
 import {
   apps,
-  drag,
   overlay,
   windows,
   type SystemWindow,
 } from '../js/index.js'
-
-const testFilePath = resolve(import.meta.dirname, 'windows.integration.test.ts')
 
 function expectWindowShape(window: SystemWindow): void {
   expect(Number.isSafeInteger(window.id)).toBe(true)
@@ -62,6 +59,13 @@ describe('JavaScript boundary validation', () => {
   it('rejects relative application paths', () => {
     expect(() => apps.icon('Safari.app')).toThrow('absolute path')
   })
+
+  it('rejects malformed window query options', () => {
+    expect(() => windows.list(null as never)).toThrow('options must be an object')
+    expect(() =>
+      windows.atPoint({ x: 0, y: 0 }, null as never),
+    ).toThrow('options must be an object')
+  })
 })
 
 describe('overlay lifecycle integration', () => {
@@ -94,18 +98,6 @@ describe('application icon integration', () => {
     await expect(
       apps.icon(resolve(import.meta.dirname, 'fixtures/missing.app')),
     ).resolves.toBeNull()
-  })
-})
-
-describe('drag boundary integration', () => {
-  it('rejects an invalid native window handle', async () => {
-    await expect(
-      drag.start({
-        files: [testFilePath],
-        windowHandle: Buffer.alloc(8),
-        position: { x: 0, y: 0 },
-      }),
-    ).rejects.toThrow('windowHandle is invalid')
   })
 })
 

@@ -1,7 +1,7 @@
 {
   "name": "@zerob13/nativekit",
   "version": "0.4.0",
-  "description": "Cross-platform native capabilities for Electron: overlays, window awareness, app icons, and file drag-out.",
+  "description": "Cross-platform native capabilities for Electron: overlays, window awareness, and app icons.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -66,7 +66,6 @@
     "n-api",
     "overlay",
     "window",
-    "drag-drop",
     "cross-platform"
   ],
   "license": "MIT",

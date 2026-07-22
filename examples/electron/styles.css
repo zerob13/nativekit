@@ -194,20 +194,9 @@ tr:last-child td {
   margin: 0;
 }
 
-.drag-section,
 .events-section {
   margin-top: 16px;
   border: 1px solid var(--border);
-}
-
-.drag-handle {
-  width: 100%;
-  min-height: 52px;
-  margin-top: 16px;
-  border: 1px dashed var(--muted);
-  background: var(--background);
-  color: var(--text);
-  user-select: none;
 }
 
 .events-section ol {

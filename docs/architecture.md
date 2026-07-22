@@ -36,8 +36,8 @@ node-gyp-build                        selects local build or N-API prebuild
 nativekit.node                        node-addon-api, N-API v8
         │
         ├── shared managers           validation, state, event dispatch
-        ├── macOS tail                AppKit / CoreGraphics / POSIX
-        └── Windows tail              Win32 / WIC / Shell / OLE
+        ├── macOS tail                AppKit / CoreGraphics
+        └── Windows tail              Win32 / WIC / Shell
 ```
 
 The TypeScript wrapper performs main-process checks, input validation, Promise
@@ -69,7 +69,6 @@ src/
     mac/window_query.mm       CGWindowList and NSWorkspace
     win/window_query.cpp      EnumWindows, DWM, foreground window
   apps/                       exact-size application icon extraction
-  drag/                       native file drag source
 js/index.ts                   public TypeScript API
 examples/electron/            context-isolated capability demo
 tests/                        package and native integration tests
@@ -132,27 +131,16 @@ DIP semantics.
 16×16 or 32×32 PNG pixels. macOS uses `NSWorkspace`; Windows uses Shell icon
 lookup plus WIC scaling and PNG encoding.
 
-### 4.4 `drag`
-
-The drag manager allows one active copy-only file drag. macOS uses
-`NSDraggingSession`; Windows uses an STA OLE thread with `CF_HDROP`,
-`IDataObject`, `IDropSource`, and `IDragSourceHelper`.
-
-The call must originate while the primary pointer button is down. The input is a
-window-client DIP point and the `ended` event reports a screen DIP point on both
-platforms. Windows converts to physical pixels only inside the native tail.
-
 ## 5. Threading and cleanup
 
 ```text
 Electron main/UI thread
   ├── shared managers and Node-API calls
-  ├── AppKit overlay and macOS drag
+  ├── AppKit overlay
   └── ThreadSafeFunction delivery
 
 Native worker threads
-  ├── Windows overlay message pump (STA)
-  └── Windows OLE drag loop (STA)
+  └── Windows overlay message pump (STA)
 ```
 
 The Node environment cleanup hook calls independent `noexcept` cleanup

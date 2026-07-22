@@ -9,11 +9,7 @@ const overlayState = element('overlay-state')
 const overlayImages = element('overlay-images')
 const appIcon = element('app-icon')
 const appName = element('app-name')
-const dragHandle = element('drag-handle')
-const dragFile = element('drag-file')
 const events = element('events')
-
-let dragActive = false
 
 function unwrap(result) {
   if (!result?.ok) throw new Error(result?.error ?? 'Unknown main-process error')
@@ -92,9 +88,6 @@ const unsubscribe = api.onEvent(({ topic, data }) => {
       setStatus(`Image rotation stopped: ${data.message}`, true)
     }
     log(`Overlay event: ${JSON.stringify(data)}`)
-  } else if (topic === 'drag') {
-    dragActive = false
-    log(`Drag ended: ${data.dropped ? 'dropped' : 'cancelled'} at ${data.x}, ${data.y}`)
   }
 })
 
@@ -140,31 +133,6 @@ element('pick-app').addEventListener('click', async (event) => {
   }
 })
 
-element('pick-file').addEventListener('click', async (event) => {
-  const selected = await run(event.currentTarget, api.pickDragFile)
-  if (selected) {
-    dragFile.textContent = selected.name
-    dragHandle.disabled = false
-    log(`Selected ${selected.name} for drag-out.`)
-  }
-})
-
-dragHandle.addEventListener('pointerdown', (event) => {
-  if (event.button !== 0 || !event.isPrimary || dragActive) return
-  event.preventDefault()
-  dragActive = true
-  setStatus('Native drag session active…')
-  api
-    .startDrag({ x: event.clientX, y: event.clientY })
-    .then(unwrap)
-    .then(() => setStatus('Ready.'))
-    .catch((error) => {
-      dragActive = false
-      setStatus(error.message, true)
-      log(`Drag error: ${error.message}`)
-    })
-})
-
 element('clear-events').addEventListener('click', () => events.replaceChildren())
 
 async function initialize() {
@@ -180,16 +148,6 @@ async function initialize() {
       renderWindows(result.windows)
       renderIcon(result.icon, 'Electron')
       renderOverlay(result.overlay)
-      dragFile.textContent = 'renderer.mjs'
-      dragHandle.disabled = false
-      await new Promise((resolvePromise) => requestAnimationFrame(resolvePromise))
-      const dragBounds = dragHandle.getBoundingClientRect()
-      const dragResult = unwrap(
-        await api.runSmokeDrag({
-          x: dragBounds.left + dragBounds.width / 2,
-          y: dragBounds.top + dragBounds.height / 2,
-        }),
-      )
       log('Native smoke validation passed.')
       setStatus('Smoke validation passed.')
       await new Promise((resolvePromise) =>
@@ -200,7 +158,6 @@ async function initialize() {
         windows: result.windows.list.length,
         icon: Boolean(result.icon),
         overlay: result.overlay.active,
-        drag: typeof dragResult.dropped === 'boolean',
       })
     }
   } catch (error) {

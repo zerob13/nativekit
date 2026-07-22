@@ -23,12 +23,6 @@ void call_javascript(
           callback.Call({Napi::Number::New(env, value)});
         } else if constexpr (std::is_same_v<Value, std::string>) {
           callback.Call({Napi::String::New(env, value)});
-        } else if constexpr (std::is_same_v<Value, DragEndedEvent>) {
-          Napi::Object result = Napi::Object::New(env);
-          result.Set("dropped", value.dropped);
-          result.Set("x", value.x);
-          result.Set("y", value.y);
-          callback.Call({result});
         }
       },
       *owned);

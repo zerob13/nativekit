@@ -62,16 +62,6 @@ export interface FrontmostWindow {
   title: string | null
 }
 
-export interface DragConfig {
-  files: string[]
-  windowHandle: Buffer
-  position: Point
-}
-
-export interface DragResult extends Point {
-  dropped: boolean
-}
-
 interface NativeBinding {
   overlayStart(options: OverlayOptions): boolean
   overlayStop(): boolean
@@ -98,13 +88,10 @@ interface NativeBinding {
 
   appsIcon(appPath: string, size: 'small' | 'medium'): string | null
 
-  dragStart(config: DragConfig): boolean
-  dragOnEnded?(callback: (result: DragResult) => void): void
 }
 
 interface ElectronScreen {
   dipToScreenPoint(point: Point): Point
-  screenToDipPoint(point: Point): Point
   screenToDipRect(window: null, rect: Rect): Rect
 }
 
@@ -132,9 +119,12 @@ function loadNative(): NativeBinding {
 
 function assertMainProcess(): void {
   const electronProcess = process as NodeJS.Process & { type?: string }
+  if (!process.versions.electron) return
+  const electron = require('electron') as { BrowserWindow?: unknown }
   if (
-    process.versions.electron &&
-    (electronProcess.type !== 'browser' || !isMainThread)
+    electronProcess.type !== 'browser' ||
+    !isMainThread ||
+    typeof electron.BrowserWindow !== 'function'
   ) {
     throw new Error(
       'nativekit must run in the Electron main process; expose only the ' +
@@ -269,6 +259,7 @@ class Windows {
 
   list(options: { relativeTo?: number } = {}): Promise<SystemWindow[]> {
     assertMainProcess()
+    requireRecord(options, 'options')
     if (options.relativeTo !== undefined) {
       requireWindowId(options.relativeTo, 'options.relativeTo')
     }
@@ -293,6 +284,7 @@ class Windows {
   ): Promise<SystemWindow | null> {
     assertMainProcess()
     requirePoint(point, 'point')
+    requireRecord(options, 'options')
     if (options.belowId !== undefined) {
       requireWindowId(options.belowId, 'options.belowId')
     }
@@ -323,41 +315,9 @@ class Apps {
   }
 }
 
-class Drag extends EventEmitter {
-  private active = false
-
-  start(config: DragConfig): Promise<void> {
-    assertMainProcess()
-    validateDragConfig(config)
-    if (this.active) {
-      return Promise.reject(new Error('nativekit: a drag session is active'))
-    }
-
-    this.active = true
-    return new Promise<void>((resolvePromise, rejectPromise) => {
-      const onEnded = (): void => {
-        this.active = false
-        resolvePromise()
-      }
-      this.once('ended', onEnded)
-
-      try {
-        if (!native.dragStart(config)) {
-          throw new Error('nativekit: the native drag session did not start')
-        }
-      } catch (error) {
-        this.off('ended', onEnded)
-        this.active = false
-        rejectPromise(error)
-      }
-    })
-  }
-}
-
 export const overlay = new Overlay()
 export const windows = new Windows()
 export const apps = new Apps()
-export const drag = new Drag()
 
 native.overlayOnMaxSizeChanged?.((size) =>
   overlay.emit('maxSizeChanged', size),
@@ -366,11 +326,8 @@ native.overlayOnActivate?.(() => overlay.emit('activate'))
 native.overlayOnVisibilityRequest?.((visible) =>
   overlay.emit('visibilityRequest', visible),
 )
-native.dragOnEnded?.((result) =>
-  drag.emit('ended', dragResultFromNativeCoordinates(result)),
-)
 
-export default { overlay, windows, apps, drag }
+export default { overlay, windows, apps }
 
 function electronScreen(): ElectronScreen | null {
   if (process.platform !== 'win32' || !process.versions.electron) return null
@@ -395,13 +352,6 @@ function nullableWindowFromNativeCoordinates(
   return window === null ? null : windowFromNativeCoordinates(window)
 }
 
-function dragResultFromNativeCoordinates(result: DragResult): DragResult {
-  const screen = electronScreen()
-  if (screen === null) return result
-  const point = screen.screenToDipPoint(result)
-  return { ...point, dropped: result.dropped }
-}
-
 function validateOverlayOptions(options: OverlayOptions): void {
   requireRecord(options, 'options')
   if (options.tooltip === undefined) return
@@ -415,18 +365,6 @@ function validateOverlayOptions(options: OverlayOptions): void {
       'options.tooltip.relocate',
     )
   }
-}
-
-function validateDragConfig(config: DragConfig): void {
-  requireRecord(config, 'config')
-  if (!Array.isArray(config.files) || config.files.length === 0) {
-    throw new TypeError('config.files must be a non-empty array')
-  }
-  config.files.forEach((file, index) =>
-    requireAbsolutePath(file, `config.files[${index}]`),
-  )
-  requireBuffer(config.windowHandle, 'config.windowHandle')
-  requirePoint(config.position, 'config.position')
 }
 
 function requireRecord(

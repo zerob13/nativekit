@@ -11,11 +11,7 @@ contextBridge.exposeInMainWorld(
     pickOverlayImages: () => invoke('nativekit:overlay:pick'),
     hideOverlay: () => invoke('nativekit:overlay:hide'),
     pickApp: () => invoke('nativekit:apps:pick'),
-    pickDragFile: () => invoke('nativekit:drag:pick'),
-    startDrag: (position) => invoke('nativekit:drag:start', position),
     runSmoke: () => invoke('nativekit:smoke:run'),
-    runSmokeDrag: (position) =>
-      invoke('nativekit:smoke:drag', position),
     completeSmoke: (result) =>
       invoke('nativekit:smoke:complete', result),
     onEvent: (callback) => {

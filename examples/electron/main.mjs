@@ -11,7 +11,6 @@ import {
 } from 'electron'
 import {
   apps,
-  drag,
   overlay,
   windows,
 } from '@zerob13/nativekit'
@@ -21,14 +20,10 @@ const presentationId = 'nativekit-sample'
 const sessionId = 'nativekit-demo-session'
 const overlayRotationIntervalMs = 5_000
 const maximumOverlaySourceSize = 1_600
-const smokeDragFilePath = fileURLToPath(
-  new URL('./renderer.mjs', import.meta.url),
-)
 const smokeMode = process.argv.includes('--smoke')
 const channels = []
 
 let mainWindow = null
-let selectedDragFile = null
 let selectedOverlayImages = []
 let overlayImageIndex = 0
 let overlayRotationTimer = null
@@ -149,7 +144,6 @@ function overlayImageAt(imagePaths, imageIndex) {
 
 function presentOverlayImage(image, imageCount, imageIndex) {
   attachOverlayHost()
-  overlay.setVisible(true)
   overlay.pushImage({
     hostId,
     presentationId,
@@ -158,6 +152,7 @@ function presentOverlayImage(image, imageCount, imageIndex) {
     appIconPath: process.execPath,
   })
   overlay.setActiveSession(sessionId)
+  overlay.setVisible(true)
   return {
     active: overlay.hasActive(),
     any: overlay.hasAny(),
@@ -239,76 +234,6 @@ async function runSmoke() {
     windows: snapshot,
     icon,
     overlay: overlayState,
-    drag: 'prepared for synthetic pointer validation',
-  }
-}
-
-async function runSmokeDrag(position) {
-  if (!smokeMode || !mainWindow) throw new Error('Smoke mode is not active')
-  if (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y)) {
-    throw new TypeError('A finite drag position is required')
-  }
-  selectedDragFile = smokeDragFilePath
-
-  let timeout = null
-  const ended = new Promise((resolvePromise, rejectPromise) => {
-    const onEnded = (result) => {
-      clearTimeout(timeout)
-      drag.off('ended', onEnded)
-      resolvePromise(result)
-    }
-    timeout = setTimeout(() => {
-      drag.off('ended', onEnded)
-      rejectPromise(new Error('Timed out waiting for the native drag session'))
-    }, 3_000)
-    drag.on('ended', onEnded)
-  })
-
-  const x = Math.round(position.x)
-  const y = Math.round(position.y)
-  const inputs = [
-    setTimeout(() => {
-      mainWindow.webContents.sendInputEvent({
-        type: 'mouseDown',
-        x,
-        y,
-        button: 'left',
-        clickCount: 1,
-      })
-    }, 20),
-    setTimeout(() => {
-      mainWindow.webContents.sendInputEvent({
-        type: 'mouseMove',
-        x: x + 12,
-        y: y + 8,
-        movementX: 12,
-        movementY: 8,
-      })
-    }, 140),
-    setTimeout(() => {
-      mainWindow.webContents.sendInputEvent({
-        type: 'mouseUp',
-        x: x + 12,
-        y: y + 8,
-        button: 'left',
-        clickCount: 1,
-      })
-    }, 280),
-    setTimeout(() => {
-      mainWindow.webContents.sendInputEvent({
-        type: 'keyDown',
-        keyCode: 'Escape',
-      })
-      mainWindow.webContents.sendInputEvent({
-        type: 'keyUp',
-        keyCode: 'Escape',
-      })
-    }, 1_000),
-  ]
-  try {
-    return await ended
-  } finally {
-    for (const input of inputs) clearTimeout(input)
   }
 }
 
@@ -353,32 +278,7 @@ function registerIpc() {
       icon: await apps.icon(path, { size: 'medium' }),
     }
   })
-  handle('nativekit:drag:pick', async () => {
-    const result = await dialog.showOpenDialog(mainWindow, {
-      title: 'Choose a file to drag',
-      properties: ['openFile'],
-    })
-    selectedDragFile = result.canceled ? null : result.filePaths[0] ?? null
-    return selectedDragFile ? { name: basename(selectedDragFile) } : null
-  })
-  handle('nativekit:drag:start', async (position) => {
-    if (!selectedDragFile) throw new Error('Choose a file first')
-    if (
-      !position ||
-      !Number.isFinite(position.x) ||
-      !Number.isFinite(position.y)
-    ) {
-      throw new TypeError('A finite drag position is required')
-    }
-    await drag.start({
-      files: [selectedDragFile],
-      windowHandle: mainWindow.getNativeWindowHandle(),
-      position,
-    })
-    return true
-  })
   handle('nativekit:smoke:run', runSmoke)
-  handle('nativekit:smoke:drag', runSmokeDrag)
   handle('nativekit:smoke:complete', completeSmoke)
 }
 
@@ -400,7 +300,6 @@ function wireNativeEvents() {
       any: overlay.hasAny(),
     })
   })
-  drag.on('ended', (result) => sendEvent('drag', result))
 }
 
 function createWindow() {

@@ -10,8 +10,7 @@ mode 打包，原生部分继续使用 CMake/cmake-js。
 
 - 可拖动、不会抢占应用焦点的原生图片 Overlay；
 - 前台应用、系统窗口枚举、查找与坐标命中；
-- 系统应用图标提取；
-- 可获知完成/取消结果的原生文件拖出。
+- 系统应用图标提取。
 
 ## 安装
 
@@ -81,15 +80,13 @@ pnpm demo:smoke
 
 交互 demo 覆盖主要桌面交互模块。点击 `Choose images` 可一次选择多张图片，Overlay
 会立即显示第一张，并每 5 秒切换一张；也可直接拖动主窗口外侧的原生 Overlay。
-文件拖出功能可拖到 Finder 或 Explorer。Smoke 模式会集中验证窗口枚举、图标、
-Overlay 渲染与原生文件拖动循环。
+Smoke 模式会集中验证窗口枚举、图标与 Overlay 渲染。
 
 ```text
 ┌ nativekit demo ───────────────────────────────────────┐
 │ Window awareness  │ Overlay: show / hide / drag      │
 │                   │ multi-image rotation every 5s    │
 │ Application icon                                     │
-│ File drag-out handle                                 │
 │ Ordered event log                                    │
 └───────────────────────────────────────────────────────┘
 ```

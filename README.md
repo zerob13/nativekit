@@ -8,24 +8,22 @@ Cross-platform native desktop primitives for the Electron main process.
 
 - session-aware floating image overlays;
 - system-window enumeration and hit testing;
-- exact-size operating-system application icons; and
-- native file drag-out with drop/cancel results.
+- exact-size operating-system application icons.
 
 Supported release targets are macOS arm64/x64 and Windows x64.
 
 ## Why this library exists
 
-Electron already provides topmost BrowserWindows, cross-workspace options on
-macOS, and `webContents.startDrag()`. `nativekit` does not
-pretend otherwise. It provides a narrower coordinated layer where applications
-need more state or results than those primitives expose.
+Electron already provides topmost BrowserWindows and cross-workspace options on
+macOS. `nativekit` does not pretend otherwise. It provides a narrower
+coordinated layer where applications need more state than those primitives
+expose.
 
 | Need | `nativekit` behavior |
 |---|---|
 | Multiple lightweight panels | Draggable native image panels with stack, host, session, suppression, and active-session lifecycle |
 | Context-aware desktop UI | Cross-process system-window list, lookup, foreground app, and point hit testing |
 | Installed application artwork | Native icon lookup normalized to exact 16×16 or 32×32 PNG |
-| File drag completion | Multi-file native copy drag with drop/cancel and final screen coordinates |
 
 ## Install
 
@@ -119,10 +117,9 @@ pnpm demo:smoke
 ```
 
 Interactive mode supports direct native-panel movement, multi-image selection
-with five-second rotation, real application selection, and Finder/Explorer file
-drag-out. Smoke mode validates window enumeration, icon extraction, overlay
-rendering, and native drag-loop completion. A successful
-macOS run prints one `NATIVEKIT_DEMO_SMOKE` JSON record and exits with status 0.
+with five-second rotation, and real application selection. Smoke mode validates
+window enumeration, icon extraction, and overlay rendering. A successful macOS
+run prints one `NATIVEKIT_DEMO_SMOKE` JSON record and exits with status 0.
 
 ```text
 ┌ nativekit demo ───────────────────────────────────────┐
@@ -133,7 +130,6 @@ macOS run prints one `NATIVEKIT_DEMO_SMOKE` JSON record and exits with status 0.
 ├───────────────────┴───────────────────────────────────┤
 │ App icon: native icon preview                         │
 ├───────────────────────────────────────────────────────┤
-│ File drag-out handle                                  │
 │ Ordered event log                                     │
 └───────────────────────────────────────────────────────┘
 ```
@@ -145,7 +141,6 @@ macOS run prints one `NATIVEKIT_DEMO_SMOKE` JSON record and exits with status 0.
 | Overlay | draggable non-activating `NSPanel`, all Spaces | draggable layered topmost `HWND`, current virtual desktop |
 | Window query | CoreGraphics + NSWorkspace | EnumWindows + DWM |
 | App icon | NSWorkspace | Shell + WIC |
-| File drag | NSDraggingSession | OLE `CF_HDROP` |
 | Public coordinates | Electron DIP | native pixels normalized to Electron DIP |
 
 macOS arm64 has local native, demo, and visual verification. Windows code is

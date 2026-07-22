@@ -6,7 +6,6 @@
         "src/binding.cpp",
         "src/apps/icon.cc",
         "src/common/event_callback.cc",
-        "src/drag/drag_source.cc",
         "src/overlay/overlay_manager.cc",
         "src/windows/window_query.cc"
       ],
@@ -24,7 +23,6 @@
           "sources": [
             "src/apps/mac/icon.mm",
             "src/common/mac/image_utils.mm",
-            "src/drag/mac/drag_source.mm",
             "src/overlay/mac/overlay_window.mm",
             "src/windows/mac/window_query.mm"
           ],
@@ -46,7 +44,6 @@
           "sources": [
             "src/apps/win/icon.cpp",
             "src/common/win/image_utils.cpp",
-            "src/drag/win/drag_source.cpp",
             "src/overlay/win/overlay_window.cpp",
             "src/windows/win/window_query.cpp"
           ],
