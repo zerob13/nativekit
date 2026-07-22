@@ -67,6 +67,7 @@ jobs:
             openbox \
             x11-utils \
             xauth \
+            xfonts-base \
             xterm \
             xvfb
 
