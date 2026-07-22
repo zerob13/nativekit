@@ -1,5 +1,7 @@
 # nativekit
 
+![nativekit README banner](docs/assets/nativekit-banner.webp)
+
 Cross-platform native desktop primitives for the Electron main process.
 
 [简体中文](README.zh-CN.md) · [Electron integration guide（中文）](docs/integration-guide.zh-CN.md)

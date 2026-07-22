@@ -1,5 +1,7 @@
 # nativekit
 
+![nativekit README banner](docs/assets/nativekit-banner.webp)
+
 [English](README.md) · [Electron 集成指南](docs/integration-guide.zh-CN.md) · [API reference](docs/api-reference.md)
 
 `nativekit` 是一个只在 Electron 主进程运行的跨平台原生能力库。它由
