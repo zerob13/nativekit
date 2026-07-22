@@ -43,7 +43,11 @@ describe('published entry points', () => {
           '--eval',
           `Object.defineProperty(process.versions, 'electron', { value: '28.0.0' }); process.type = 'browser'; require(${JSON.stringify(entry)})`,
         ],
-        { encoding: 'utf8', stdio: 'pipe' },
+        {
+          encoding: 'utf8',
+          stdio: 'pipe',
+          env: { ...process.env, ELECTRON_OVERRIDE_DIST_PATH: root },
+        },
       ),
     ).toThrow('nativekit must run in the Electron main process')
   })
