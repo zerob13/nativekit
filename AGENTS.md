@@ -10,6 +10,8 @@ and app icon extraction.
 
 - **Platforms**: macOS (arm64, x64), Windows (x64), Linux X11/XWayland
   (arm64, x64)
+- **Minimum supported versions**: Electron 28.0.0, macOS 12, Windows 10 1809,
+  and Ubuntu 22.04 or a compatible glibc-based Linux distribution
 - **Binding**: C++ via `node-addon-api` (N-API v8)
 - **Native tails**: macOS uses Objective-C++ (`.mm`) calling AppKit / CoreGraphics;
   Windows uses C++ (`.cpp`) calling Win32 / Shell; Linux uses C++ (`.cpp`)

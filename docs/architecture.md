@@ -7,6 +7,11 @@ Linux X11/XWayland. It combines a small TypeScript API with a Node-API v8 addon.
 The public API is the same on every implementation; platform differences that
 cannot be removed are called out explicitly.
 
+The supported baseline is Electron 28.0.0, macOS 12 Monterey, Windows 10
+version 1809 (build 17763), and Ubuntu 22.04 or a compatible glibc-based Linux
+distribution. Release prebuilds cover macOS arm64/x64, Windows x64, and Linux
+x64/arm64.
+
 The project follows five constraints:
 
 1. One Node-API binding with symmetric native platform tails.

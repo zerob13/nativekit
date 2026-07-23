@@ -12,8 +12,18 @@ Cross-platform native desktop primitives for the Electron main process.
 - system-window enumeration and hit testing;
 - exact-size operating-system application icons.
 
-Supported release targets are macOS arm64/x64, Windows x64, and Linux
-x64/arm64. Linux window and overlay capabilities target X11/XWayland.
+## Compatibility
+
+| Runtime or platform | Minimum supported version | Architectures and notes |
+|---|---|---|
+| Electron | 28.0.0 | Main process only |
+| macOS | 12 Monterey | arm64, x64 |
+| Windows | 10 version 1809 (build 17763) | x64 |
+| Linux | Ubuntu 22.04 or a compatible glibc-based distribution | x64, arm64; X11/XWayland is required for window and overlay capabilities |
+
+Native Wayland supports app icon extraction only; it does not support window
+queries or absolute overlay placement. Workspace builds require Node.js 20.19
+or newer, while the published package declares Node.js 18 or newer.
 
 ## Why this library exists
 

@@ -6,6 +6,10 @@ The Linux implementation targets X11, including Electron applications
 running through XWayland with `--ozone-platform=x11`. The public TypeScript API
 is identical across platforms.
 
+The published x64 and arm64 prebuilds use Ubuntu 22.04 as the minimum supported
+baseline. Compatible glibc-based distributions may be used when they provide
+the required GLib/GIO, GdkPixbuf, XCB, and XCB RandR runtime libraries.
+
 This supports the mainstream GNOME, KDE Plasma, Cinnamon, Xfce, and MATE
 desktop environments when they expose an X11-compatible session. Native
 Wayland sessions are outside the supported window-query and overlay scope

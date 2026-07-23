@@ -8,12 +8,21 @@
 TypeScript API 与 Node-API v8 插件组成，JavaScript 部分使用 Vite library
 mode 打包，原生部分继续使用 CMake/cmake-js。
 
-当前发布支持 macOS arm64/x64、Windows x64，以及 Linux x64/arm64。Linux 的窗口
-与 Overlay 能力支持 X11/XWayland。主要提供：
-
 - 可拖动、不会抢占应用焦点的原生图片 Overlay；
 - 前台应用、系统窗口枚举、查找与坐标命中；
 - 系统应用图标提取。
+
+## 兼容性
+
+| 运行时或平台 | 最低支持版本 | 架构与说明 |
+|---|---|---|
+| Electron | 28.0.0 | 仅主进程 |
+| macOS | 12 Monterey | arm64、x64 |
+| Windows | 10 版本 1809（build 17763） | x64 |
+| Linux | Ubuntu 22.04 或兼容的 glibc 发行版 | x64、arm64；窗口与 Overlay 能力要求 X11/XWayland |
+
+原生 Wayland 仅支持应用图标提取，不支持窗口查询或 Overlay 绝对定位。本地工作区
+构建要求 Node.js 20.19+；发布包声明的 Node.js 最低版本为 18。
 
 ## 安装
 

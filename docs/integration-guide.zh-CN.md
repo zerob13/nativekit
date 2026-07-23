@@ -36,10 +36,19 @@ src/
 pnpm add @zerob13/nativekit
 ```
 
-发布预编译文件支持 Electron 28+、macOS arm64/x64、Windows x64，以及 Linux
-x64/arm64。Node-API v8 让同一预编译文件可跨兼容的 Electron ABI 使用，不需要
-为每个 Electron 版本单独编译。Linux 预编译文件会动态链接 GLib/GIO、
-GdkPixbuf、XCB 与 XCB RandR；最小化系统需要安装对应的 runtime packages。
+最低支持版本如下：
+
+| 运行时或平台 | 最低支持版本 | 架构与说明 |
+|---|---|---|
+| Electron | 28.0.0 | 仅主进程 |
+| macOS | 12 Monterey | arm64、x64 |
+| Windows | 10 版本 1809（build 17763） | x64 |
+| Linux | Ubuntu 22.04 或兼容的 glibc 发行版 | x64、arm64；窗口与 Overlay 能力要求 X11/XWayland |
+
+Node-API v8 让同一预编译文件可跨兼容的 Electron ABI 使用，不需要为每个
+Electron 版本单独编译。Linux 预编译文件会动态链接 GLib/GIO、GdkPixbuf、XCB
+与 XCB RandR；最小化系统需要安装对应的 runtime packages。原生 Wayland 仅支持
+应用图标提取。
 
 ## 2. 主窗口和 Overlay
 

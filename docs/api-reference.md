@@ -4,6 +4,10 @@
 code should call a narrow, context-isolated preload API instead of importing the
 package directly.
 
+The minimum supported versions are Electron 28.0.0, macOS 12 Monterey, Windows
+10 version 1809 (build 17763), and Ubuntu 22.04 or a compatible glibc-based
+Linux distribution. Linux window and overlay APIs require X11/XWayland.
+
 ```ts
 import { apps, overlay, windows } from '@zerob13/nativekit'
 ```
