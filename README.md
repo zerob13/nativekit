@@ -12,9 +12,8 @@ Cross-platform native desktop primitives for the Electron main process.
 - system-window enumeration and hit testing;
 - exact-size operating-system application icons.
 
-Implemented targets are macOS arm64/x64, Windows x64, and Linux x64/arm64.
-Linux currently targets X11/XWayland and is validated as a build-only target;
-Linux prebuilds are not published by the release workflow yet.
+Supported release targets are macOS arm64/x64, Windows x64, and Linux
+x64/arm64. Linux window and overlay capabilities target X11/XWayland.
 
 ## Why this library exists
 
@@ -45,12 +44,13 @@ The release workflow places these Node-API prebuilds in the npm tarball:
 darwin-arm64
 darwin-x64
 win32-x64
+linux-x64
+linux-arm64
 ```
 
-Linux users can build the current source on an X11-capable desktop. The normal
-release workflow intentionally does not publish `linux-x64` or `linux-arm64`
-prebuilds until the implementation has also been exercised on real GNOME and
-KDE systems.
+Linux prebuilds dynamically link GLib/GIO, GdkPixbuf, XCB, and XCB RandR.
+These libraries are normally present on an X11 desktop; minimal systems must
+install their runtime packages.
 
 `node-gyp-build` selects the matching artifact. A consumer can explicitly build
 from source through the included `binding.gyp`, but normal installation should
@@ -170,22 +170,23 @@ does not expose other clients' surfaces or global coordinates to a regular
 client, and it prevents arbitrary top-level placement. Launch Electron with
 `--ozone-platform=x11` when these capabilities are required. Icon extraction
 can still work under Wayland, but it is not a substitute for the unavailable
-window APIs. See [the Linux support plan](docs/linux-support-plan.md) for the
+window APIs. See [the Linux support notes](docs/linux-support-plan.md) for the
 scope and deferred compositor-specific work.
 
 ## Publish to npm
 
-The source version and tag must match. For `0.4.0`:
+The source version and tag must match. For a release version `X.Y.Z`:
 
 1. Configure npm trusted publishing for this GitHub repository and
    `.github/workflows/release.yml`.
-2. Confirm the package version in `package.json` is `0.4.0`.
-3. Commit the release state and create tag `v0.4.0`.
+2. Confirm the package version in `package.json` is `X.Y.Z`.
+3. Commit the release state and create tag `vX.Y.Z`.
 4. Push the tag.
 
 The release workflow then:
 
-1. builds and tests macOS arm64, macOS x64, and Windows x64 independently;
+1. builds and tests macOS arm64/x64, Windows x64, and Linux x64/arm64
+   independently, with Linux X11 tests running under Xvfb/Openbox;
 2. uploads platform-named `nativekit.napi.node` artifacts;
 3. assembles and inspects one npm tarball;
 4. publishes the exact tarball; and

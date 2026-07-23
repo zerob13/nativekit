@@ -8,8 +8,8 @@
 TypeScript API 与 Node-API v8 插件组成，JavaScript 部分使用 Vite library
 mode 打包，原生部分继续使用 CMake/cmake-js。
 
-当前实现 macOS arm64/x64、Windows x64，以及 Linux x64/arm64。Linux 首版只支持
-X11/XWayland，当前仅进入 build CI，不加入 release workflow。主要提供：
+当前发布支持 macOS arm64/x64、Windows x64，以及 Linux x64/arm64。Linux 的窗口
+与 Overlay 能力支持 X11/XWayland。主要提供：
 
 - 可拖动、不会抢占应用焦点的原生图片 Overlay；
 - 前台应用、系统窗口枚举、查找与坐标命中；
@@ -29,10 +29,12 @@ npm 包会携带以下 Node-API 预编译文件，正常安装不需要本机 C+
 darwin-arm64
 darwin-x64
 win32-x64
+linux-x64
+linux-arm64
 ```
 
-Linux 目前需要从源码构建；`linux-x64` 与 `linux-arm64` 预编译文件暂不随 npm
-release 发布，等待在真实 GNOME 与 KDE 设备上补充运行验证后再进入发布流程。
+Linux 预编译文件会动态链接 GLib/GIO、GdkPixbuf、XCB 与 XCB RandR。常规 X11
+桌面通常已经包含这些运行库；最小化系统需要自行安装对应的 runtime packages。
 
 库只能在 Electron 主进程导入。Renderer 应通过启用
 `contextIsolation` 的 preload 暴露最小业务接口，不能直接暴露整个模块。
@@ -117,8 +119,8 @@ pnpm check
 Linux 的 Overlay 和窗口查询要求 Electron 运行在 X11/XWayland。原生 Wayland
 不会向普通客户端暴露其他应用窗口、全局坐标或任意顶层窗口定位；需要这些能力时，
 请使用 `--ozone-platform=x11` 启动 Electron。GNOME、KDE Plasma、Cinnamon、
-Xfce 与 MATE 的 X11 会话属于首版支持范围。完整边界见
-[Linux support plan](docs/linux-support-plan.md)。
+Xfce 与 MATE 的 X11 会话属于支持范围。完整边界见
+[Linux support notes](docs/linux-support-plan.md)。
 
 完整的主进程、preload、Renderer、打包和故障排查示例见
 [Electron 集成指南](docs/integration-guide.zh-CN.md)。全部方法与事件定义见
@@ -128,8 +130,9 @@ Xfce 与 MATE 的 X11 会话属于首版支持范围。完整边界见
 
 版本号与 `vX.Y.Z` tag 必须一致。推送匹配 `v*` 的 tag 会触发发布，普通分支
 push（包括 `main`）不会；也可以在 GitHub Actions 手动运行 `release` workflow
-并输入已有 tag。workflow 会分别构建并测试 macOS arm64、macOS x64 和 Windows
-x64，组装唯一 npm tarball，再发布同一份归档到 npm 与 GitHub Release。发布身份
-由 npm Trusted Publishing 提供。
+并输入已有 tag。workflow 会分别构建并测试 macOS arm64/x64、Windows x64 和
+Linux x64/arm64；Linux 会在 Xvfb/Openbox 下运行 X11 集成与 Electron smoke
+测试。随后 workflow 组装唯一 npm tarball，再发布同一份归档到 npm 与 GitHub
+Release。发布身份由 npm Trusted Publishing 提供。
 
 许可证：MIT。

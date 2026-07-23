@@ -9,7 +9,7 @@ desktop apps OS-level capabilities: floating overlays, native window awareness,
 and app icon extraction.
 
 - **Platforms**: macOS (arm64, x64), Windows (x64), Linux X11/XWayland
-  (arm64, x64; build-only until release validation is complete)
+  (arm64, x64)
 - **Binding**: C++ via `node-addon-api` (N-API v8)
 - **Native tails**: macOS uses Objective-C++ (`.mm`) calling AppKit / CoreGraphics;
   Windows uses C++ (`.cpp`) calling Win32 / Shell; Linux uses C++ (`.cpp`)
@@ -25,11 +25,11 @@ src/
   binding.cpp                 # N-API entry — registers all modules
   common/                     # shared C++ types & helpers
   overlay/                    # floating panel system
-    mac/*.mm  win/*.cpp
+    mac/*.mm  win/*.cpp  linux/*.cpp
   windows/                    # system window query
-    mac/*.mm  win/*.cpp
+    mac/*.mm  win/*.cpp  linux/*.cpp
   apps/                       # app icon extraction
-    mac/*.mm  win/*.cpp
+    mac/*.mm  win/*.cpp  linux/*.cpp
 js/
   index.ts                    # TS wrapper: platform guard, validation, types
 docs/
@@ -105,7 +105,7 @@ Native build requires:
 - **Windows**: Visual Studio Build Tools 2019+ (Desktop C++ workload)
 - **Linux**: GLib/GIO, GdkPixbuf, XCB, XCB RandR, and pkg-config development
   packages
-- **Both**: Node.js 18+, CMake 3.22+
+- **All**: Node.js 18+, CMake 3.22+
 
 ## CI / Release
 
@@ -114,11 +114,11 @@ GitHub Actions (`.github/workflows/`):
    and native Ubuntu 22.04 runners (arm64/x64). Linux runs X11 integration and
    Electron smoke tests under Xvfb/Openbox. Uploads each as a workflow artifact.
 2. `release.yml` — runs on `v*` tag pushes or manual dispatch with an existing
-   tag, downloads all build artifacts, assembles
-   `prebuilds/<platform>-<arch>/nativekit.node`, runs `prebuildify --napi`, and
-   publishes to npm through Trusted Publishing.
+   tag, builds and tests all five targets, assembles
+   `prebuilds/<platform>-<arch>/nativekit.napi.node`, and publishes to npm
+   through Trusted Publishing.
 
-See `docs/architecture.md` §9 for the distribution flow.
+See `docs/architecture.md` §6 for the distribution flow.
 
 ## What to do / not do
 

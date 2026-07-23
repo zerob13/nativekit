@@ -1,20 +1,20 @@
-# Linux support plan
+# Linux support
 
-## 1. Decision
+## 1. Scope
 
-The first Linux implementation targets X11, including Electron applications
+The Linux implementation targets X11, including Electron applications
 running through XWayland with `--ozone-platform=x11`. The public TypeScript API
-will remain unchanged.
+is identical across platforms.
 
 This supports the mainstream GNOME, KDE Plasma, Cinnamon, Xfce, and MATE
 desktop environments when they expose an X11-compatible session. Native
-Wayland sessions are explicitly outside the first implementation because a
-regular Wayland client cannot inspect other clients' surfaces or their global
-coordinates, and compositors do not allow arbitrary top-level window
-positioning. Electron documents the same constraint and recommends XWayland
-when an application needs programmatic positioning.
+Wayland sessions are outside the supported window-query and overlay scope
+because a regular Wayland client cannot inspect other clients' surfaces or
+their global coordinates, and compositors do not allow arbitrary top-level
+window positioning. Electron documents the same constraint and recommends
+XWayland when an application needs programmatic positioning.
 
-The implementation will not add compositor-specific GNOME Shell extensions,
+The implementation does not add compositor-specific GNOME Shell extensions,
 KWin scripts, or private D-Bus APIs. Those approaches would create different
 installation and security contracts for each desktop and would not preserve a
 single package API.
@@ -29,8 +29,8 @@ Primary references:
 
 ## 2. Native architecture
 
-Linux will use the existing shared managers and add one symmetric platform tail
-per module.
+Linux uses the existing shared managers with one symmetric platform tail per
+module.
 
 ```text
 nativekit.node
@@ -59,9 +59,9 @@ loop before attaching the overlay host.
 
 ### Window queries
 
-Use XCB instead of Xlib so stale or invalid cross-process window identifiers
-produce request errors rather than invoking Xlib's process-global error
-handler.
+The implementation uses XCB instead of Xlib so stale or invalid cross-process
+window identifiers produce request errors rather than invoking Xlib's
+process-global error handler.
 
 - Read `_NET_CLIENT_LIST_STACKING` and reverse its bottom-to-top order.
 - Fall back to the root window tree when the window manager does not publish
@@ -81,14 +81,14 @@ installed freedesktop icon themes. Fall back to the file's GIO icon for paths
 without a matching desktop entry. Rasterize through GdkPixbuf to the existing
 exact 16×16 or 32×32 PNG data URL contract.
 
-Linux `appPath` will accept an absolute `.desktop`, executable, AppImage, or
-other file path. A generic file icon is an acceptable fallback when no desktop
-entry identifies the application.
+Linux `appPath` accepts an absolute `.desktop`, executable, AppImage, or other
+file path. A generic file icon is an acceptable fallback when no desktop entry
+identifies the application.
 
 ### Overlay
 
-Create one undecorated XCB top-level window per presentation on a dedicated X11
-event thread. Each window will:
+The overlay creates one undecorated XCB top-level window per presentation on a
+dedicated X11 event thread. Each window:
 
 - stay above normal windows without accepting keyboard focus;
 - be hidden from taskbar and pager lists and request all-workspace visibility;
@@ -104,25 +104,24 @@ PNG/JPEG decode and PNG encode without adding a second image stack. Hover
 tooltips are deferred in the first X11 renderer; the controls and configured
 strings remain API-compatible.
 
-## 3. Build and package changes
+## 3. Build and distribution
 
-- Add Linux sources symmetrically to CMake and `binding.gyp`.
-- Discover `gdk-pixbuf-2.0`, `gio-unix-2.0`, `xcb`, and `xcb-randr` through
+- Linux sources are listed symmetrically in CMake and `binding.gyp`.
+- Builds discover `gdk-pixbuf-2.0`, `gio-unix-2.0`, `xcb`, and `xcb-randr` through
   `pkg-config`.
-- Add `linux` to the npm OS allowlist and add a `build:linux` script.
-- Produce build artifacts named `linux-x64` and `linux-arm64`.
-- Document source-build packages for Debian/Ubuntu and equivalent development
-  packages for other distributions.
+- The npm OS allowlist includes `linux`, and `pnpm build:linux` builds for the
+  current architecture.
+- Releases contain `linux-x64` and `linux-arm64` Node-API prebuilds.
+- Debian/Ubuntu source-build dependencies are documented in the READMEs.
 
-The Linux native addon will dynamically depend on GLib/GIO, GdkPixbuf, XCB,
-and XCB RandR. These libraries are standard in the supported desktop sessions,
-but minimal/headless installations must install them explicitly.
+The Linux native addon dynamically depends on GLib/GIO, GdkPixbuf, XCB, and XCB
+RandR. These libraries are standard in the supported desktop sessions, but
+minimal/headless installations must install them explicitly.
 
-## 4. Build-only CI
+## 4. CI and release
 
-Extend `.github/workflows/build.yml`; do not change `release.yml` in this work.
-The Linux jobs will use GitHub-hosted Ubuntu 22.04 x64 and arm64 runners. Each
-job will:
+The build and release workflows use native Ubuntu 22.04 x64 and arm64 runners.
+Each Linux job:
 
 1. install GLib/GdkPixbuf/XCB development packages, Xvfb, Openbox, and X11
    test tools;
@@ -132,32 +131,28 @@ job will:
 5. run the Electron demo smoke flow to exercise window enumeration, icon
    extraction, image overlay rendering, and cleanup;
 6. verify the npm package contents; and
-7. upload a build artifact without publishing it.
+7. upload a platform-named prebuild artifact.
 
-The feature branch will be pushed and the build workflow manually dispatched
-against that ref. Every Linux matrix job must pass before the pull request is
-opened. CI failures will be fixed in focused follow-up commits and the workflow
-will be dispatched again.
+For a release tag, the publish job downloads both Linux artifacts together with
+the macOS and Windows artifacts. It verifies all five prebuilds in one npm
+tarball before publishing the same archive to npm and GitHub Releases.
 
-## 5. Acceptance criteria
+## 5. Verification
 
 - CMake and node-gyp source lists remain symmetric across all three platforms.
 - Linux x64 and arm64 addons compile on Ubuntu 22.04.
 - The native integration suite passes under Xvfb and Openbox.
 - The Electron smoke demo exits successfully under the same X11 session.
-- The package dry run contains the expected Linux-compatible sources and
-  metadata.
+- The release tarball contains `linux-x64` and `linux-arm64` prebuilds.
 - Existing macOS and Windows build jobs remain unchanged and build successfully.
 - README, architecture, API reference, and integration documentation describe
   Linux dependencies, X11 support, and native Wayland limitations.
 
-## 6. Deferred work
+## 6. Limitations
 
 - Native Wayland window enumeration, hit testing, and absolute overlay
   placement remain unsupported until a stable cross-compositor protocol exists.
 - Compositor-specific integrations may be proposed later as optional adapters,
   but they must not silently change the shared API contract.
-- Linux prebuild publication remains disabled until runtime validation is done
-  on real GNOME and KDE machines in addition to the build-only CI coverage.
 - Sandboxed Flatpak/Snap applications may require packaged GIO/X11 libraries
   and filesystem permissions for desktop-entry or executable icon lookup.

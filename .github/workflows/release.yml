@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing release tag, for example v0.4.0
+        description: Existing release tag, for example v1.2.3
         required: true
         type: string
 
@@ -30,6 +30,12 @@ jobs:
           - target: win32-x64
             arch: x64
             runner: windows-2022
+          - target: linux-x64
+            arch: x64
+            runner: ubuntu-22.04
+          - target: linux-arm64
+            arch: arm64
+            runner: ubuntu-22.04-arm
 
     steps:
       - name: Checkout release tag
@@ -51,6 +57,23 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
 
+      - name: Install Linux desktop dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            dbus-x11 \
+            libgdk-pixbuf-2.0-dev \
+            libglib2.0-dev \
+            libxcb1-dev \
+            libxcb-randr0-dev \
+            openbox \
+            x11-utils \
+            xauth \
+            xfonts-base \
+            xterm \
+            xvfb
+
       - name: Setup MSVC
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
@@ -61,7 +84,71 @@ jobs:
         run: pnpm exec cmake-js build --arch=${{ matrix.arch }}
 
       - name: Build package and run integration tests
+        if: runner.os != 'Linux'
         run: pnpm check
+
+      - name: Run Linux X11 integration tests
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          xvfb-run \
+            --auto-servernum \
+            --server-args='-screen 0 1280x1024x24' \
+            bash <<'EOF'
+          set -euo pipefail
+
+          openbox >/tmp/nativekit-openbox.log 2>&1 &
+          wm_pid=$!
+          fixture_pid=''
+          cleanup() {
+            status=$?
+            trap - EXIT
+            if [ "$status" -ne 0 ]; then
+              cat /tmp/nativekit-openbox.log || true
+              cat /tmp/nativekit-xterm.log 2>/dev/null || true
+              xprop -root _NET_SUPPORTING_WM_CHECK 2>/dev/null || true
+              xprop -root _NET_CLIENT_LIST 2>/dev/null || true
+            fi
+            if [ -n "$fixture_pid" ]; then kill "$fixture_pid" 2>/dev/null || true; fi
+            kill "$wm_pid" 2>/dev/null || true
+            exit "$status"
+          }
+          trap cleanup EXIT
+
+          wm_ready=false
+          for attempt in $(seq 1 150); do
+            if xprop -root _NET_SUPPORTING_WM_CHECK 2>/dev/null \
+              | grep -Eq '^_NET_SUPPORTING_WM_CHECK\(WINDOW\): window id # 0x[0-9a-f]+'; then
+              wm_ready=true
+              break
+            fi
+            kill -0 "$wm_pid"
+            sleep 0.1
+          done
+          test "$wm_ready" = true
+
+          xterm -geometry 40x8+20+20 -title 'nativekit CI fixture' \
+            -hold -e /bin/sh -c 'printf "nativekit CI fixture\n"' \
+            >/tmp/nativekit-xterm.log 2>&1 &
+          fixture_pid=$!
+          fixture_ready=false
+          for attempt in $(seq 1 150); do
+            if xprop -root _NET_CLIENT_LIST 2>/dev/null \
+              | grep -Eq '0x[0-9a-f]+'; then
+              fixture_ready=true
+              break
+            fi
+            kill -0 "$fixture_pid"
+            sleep 0.1
+          done
+          test "$fixture_ready" = true
+
+          pnpm check
+          ELECTRON_ENABLE_LOGGING=1 \
+            dbus-run-session -- \
+            timeout 90s \
+            pnpm exec electron examples/electron --smoke --disable-gpu
+          EOF
 
       - name: Prepare N-API prebuild
         shell: bash
@@ -142,7 +229,7 @@ jobs:
       - name: Assemble package
         shell: bash
         run: |
-          for target in darwin-arm64 darwin-x64 win32-x64; do
+          for target in darwin-arm64 darwin-x64 win32-x64 linux-x64 linux-arm64; do
             source="artifacts/prebuild-${target}/nativekit.napi.node"
             test -f "$source"
             mkdir -p "prebuilds/${target}"
@@ -157,7 +244,7 @@ jobs:
           archive=$(npm pack --ignore-scripts --silent)
           test -n "$archive"
           contents=$(tar -tf "$archive")
-          for target in darwin-arm64 darwin-x64 win32-x64; do
+          for target in darwin-arm64 darwin-x64 win32-x64 linux-x64 linux-arm64; do
             grep -Fqx "package/prebuilds/${target}/nativekit.napi.node" <<< "$contents"
           done
           echo "archive=$archive" >> "$GITHUB_OUTPUT"

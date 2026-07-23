@@ -36,10 +36,10 @@ src/
 pnpm add @zerob13/nativekit
 ```
 
-发布预编译文件支持 Electron 28+、macOS arm64/x64 和 Windows x64。Linux
-x64/arm64 当前是 build-only 目标，需要从源码构建，暂不随 release 发布。
-Node-API v8 让同一预编译文件可跨兼容的 Electron ABI 使用，不需要为每个
-Electron 版本单独编译。
+发布预编译文件支持 Electron 28+、macOS arm64/x64、Windows x64，以及 Linux
+x64/arm64。Node-API v8 让同一预编译文件可跨兼容的 Electron ABI 使用，不需要
+为每个 Electron 版本单独编译。Linux 预编译文件会动态链接 GLib/GIO、
+GdkPixbuf、XCB 与 XCB RandR；最小化系统需要安装对应的 runtime packages。
 
 ## 2. 主窗口和 Overlay
 
@@ -270,11 +270,12 @@ const icon = await apps.icon(applicationPath, { size: 'medium' })
 macOS arm64 app → darwin-arm64 prebuild
 macOS x64 app   → darwin-x64 prebuild
 Windows x64 app → win32-x64 prebuild
+Linux x64 app   → linux-x64 prebuild
+Linux arm64 app → linux-arm64 prebuild
 ```
 
-Linux build CI 会生成 `linux-x64` 与 `linux-arm64` 检查产物，但 release workflow
-暂不打包它们。Linux 应用在这一阶段应固定到源码构建产物，不应假设 npm tarball
-已经包含 Linux prebuild。
+Linux 的 Overlay 与窗口查询仍要求 Electron 运行在 X11/XWayland；预编译文件
+不会绕过原生 Wayland 的窗口枚举、全局坐标与顶层窗口定位限制。
 
 ## 6. 验证和故障排查
 

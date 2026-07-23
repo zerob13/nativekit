@@ -191,14 +191,15 @@ Release CI builds and tests these published targets independently:
 prebuilds/darwin-arm64/nativekit.napi.node
 prebuilds/darwin-x64/nativekit.napi.node
 prebuilds/win32-x64/nativekit.napi.node
+prebuilds/linux-x64/nativekit.napi.node
+prebuilds/linux-arm64/nativekit.napi.node
 ```
 
-Build-only CI additionally compiles `linux-x64` and `linux-arm64` on native
-Ubuntu 22.04 runners. It starts Xvfb, Openbox, and an X11 fixture client, then
-runs both the native integration suite and the Electron demo smoke flow. These
-artifacts are uploaded for inspection but are not consumed by `release.yml`.
+Linux targets build on native Ubuntu 22.04 x64 and arm64 runners. CI starts
+Xvfb, Openbox, and an X11 fixture client, then runs both the native integration
+suite and the Electron demo smoke flow.
 
-The publish job assembles the three released artifacts, builds the Vite library,
+The publish job assembles all five released artifacts, builds the Vite library,
 verifies the npm tarball, publishes that tarball, and attaches the same archive
 to the GitHub release. `node-gyp-build` prefers the matching Node-API prebuild
 and falls back to `binding.gyp` when a consumer explicitly builds from source.
