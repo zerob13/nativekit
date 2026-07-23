@@ -1,4 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
+
+set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version")
+
 project(nativekit LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -17,7 +20,6 @@ if(APPLE)
   enable_language(OBJCXX)
   set(CMAKE_OBJCXX_STANDARD 17)
   set(CMAKE_OBJCXX_STANDARD_REQUIRED ON)
-  set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version")
 
   list(APPEND NATIVEKIT_SOURCES
     src/apps/mac/icon.mm
