@@ -596,6 +596,50 @@ class LinuxOverlayPlatform final : public OverlayPlatform {
     screen_ = screens.data;
     initialize_pixel_format(setup);
     initialize_atoms();
+    // xwayland-satellite re-presents each X11 window to the compositor as a
+    // plain xdg-toplevel, which has no absolute-position request, so a
+    // free-floating overlay cannot be moved on screen. A child of the Electron
+    // host window is positioned relative to its parent, and that IS honored, so
+    // under satellite we parent the panel to the host (clipped to host bounds).
+    // Integrated XWayland and bare X11 honor top-level coordinates directly.
+    embed_in_host_ = running_under_xwayland_satellite();
+  }
+
+  // xwayland-satellite advertises _NET_WM_NAME = "xwayland-satellite" on the
+  // _NET_SUPPORTING_WM_CHECK window. Integrated XWayland reports the real
+  // compositor's WM name there, and bare X11 has no check window.
+  bool running_under_xwayland_satellite() const {
+    std::unique_ptr<xcb_get_property_reply_t, decltype(&std::free)> check(
+        xcb_get_property_reply(
+            connection_,
+            xcb_get_property(
+                connection_, false, screen_->root,
+                intern_atom(connection_, "_NET_SUPPORTING_WM_CHECK"),
+                XCB_ATOM_WINDOW, 0, 1),
+            nullptr),
+        &std::free);
+    if (!check || check->format != 32 ||
+        xcb_get_property_value_length(check.get()) < 4) {
+      return false;
+    }
+    const xcb_window_t wm_window =
+        *static_cast<const xcb_window_t*>(xcb_get_property_value(check.get()));
+    if (wm_window == XCB_WINDOW_NONE) return false;
+    std::unique_ptr<xcb_get_property_reply_t, decltype(&std::free)> name(
+        xcb_get_property_reply(
+            connection_,
+            xcb_get_property(
+                connection_, false, wm_window, atoms_.net_wm_name,
+                XCB_GET_PROPERTY_TYPE_ANY, 0, 64),
+            nullptr),
+        &std::free);
+    if (!name || name->format != 8) return false;
+    const int length = xcb_get_property_value_length(name.get());
+    const auto* value =
+        static_cast<const char*>(xcb_get_property_value(name.get()));
+    return length > 0 && value != nullptr &&
+        std::string(value, static_cast<std::size_t>(length)) ==
+            "xwayland-satellite";
   }
 
   void initialize_pixel_format(const xcb_setup_t* setup) {
@@ -863,6 +907,25 @@ class LinuxOverlayPlatform final : public OverlayPlatform {
   }
 
   RectI work_area_for_host(const OverlayHost& host) const {
+    if (embed_in_host_ && host.window_handle != 0 &&
+        host.window_handle <=
+            static_cast<std::uint64_t>(
+                std::numeric_limits<xcb_window_t>::max())) {
+      // Embedded child: origin is the host top-left and the clamp is the host's
+      // real pixel size, so anchoring, clamping, and drag all stay in the
+      // parent's coordinate space.
+      std::unique_ptr<xcb_get_geometry_reply_t, decltype(&std::free)> geometry(
+          xcb_get_geometry_reply(
+              connection_,
+              xcb_get_geometry(
+                  connection_,
+                  static_cast<xcb_window_t>(host.window_handle)),
+              nullptr),
+          &std::free);
+      if (geometry && geometry->width > 0 && geometry->height > 0) {
+        return {0, 0, geometry->width, geometry->height};
+      }
+    }
     const RectI monitor = monitor_for_host(host);
     const RectI available = intersect_rects(monitor, desktop_work_area());
     return available.width > 0 && available.height > 0
@@ -1004,6 +1067,11 @@ class LinuxOverlayPlatform final : public OverlayPlatform {
     state->id = item.id;
     state->host_id = item.host_id;
     state->window = xcb_generate_id(connection_);
+    // Parent to the Electron host under xwayland-satellite; the root otherwise.
+    const xcb_window_t parent =
+        embed_in_host_ && item.host_window != XCB_WINDOW_NONE
+        ? item.host_window
+        : screen_->root;
     const std::uint32_t values[] = {
         screen_->black_pixel,
         XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_BUTTON_PRESS |
@@ -1014,7 +1082,7 @@ class LinuxOverlayPlatform final : public OverlayPlatform {
         connection_,
         pixel_format_.depth,
         state->window,
-        screen_->root,
+        parent,
         static_cast<std::int16_t>(item.x),
         static_cast<std::int16_t>(item.y),
         static_cast<std::uint16_t>(item.width),
@@ -1421,6 +1489,7 @@ class LinuxOverlayPlatform final : public OverlayPlatform {
   std::exception_ptr worker_error_;
   bool startup_complete_ = false;
   bool stopping_ = false;
+  bool embed_in_host_ = false;
   int wake_fd_ = -1;
 
   xcb_connection_t* connection_ = nullptr;
