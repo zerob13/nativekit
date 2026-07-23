@@ -77,11 +77,20 @@ std::uintptr_t parse_window_handle(const Napi::Value& value) {
     throw std::invalid_argument("windowHandle must be a Buffer");
   }
   const auto buffer = value.As<Napi::Buffer<std::uint8_t>>();
+#if defined(__linux__)
+  if (buffer.Length() != sizeof(std::uint32_t)) {
+    throw std::invalid_argument("windowHandle has an unexpected size");
+  }
+  std::uint32_t x_window = 0;
+  std::memcpy(&x_window, buffer.Data(), sizeof(x_window));
+  const std::uintptr_t handle = x_window;
+#else
   if (buffer.Length() != sizeof(std::uintptr_t)) {
     throw std::invalid_argument("windowHandle has an unexpected size");
   }
   std::uintptr_t handle = 0;
   std::memcpy(&handle, buffer.Data(), sizeof(handle));
+#endif
   if (handle == 0) throw std::invalid_argument("windowHandle is null");
   return handle;
 }

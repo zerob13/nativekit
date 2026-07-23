@@ -20,6 +20,7 @@
     "build:native": "cmake-js build",
     "build:mac": "cmake-js build --arch=arm64 --out=build/darwin-arm64 && cmake-js build --arch=x64 --out=build/darwin-x64",
     "build:win": "cmake-js build --arch=x64 --out=build/win32-x64",
+    "build:linux": "cmake-js build",
     "prebuilds": "prebuildify --napi --strip",
     "test": "vitest run",
     "check": "pnpm build:js && tsc --noEmit && vitest run",
@@ -45,6 +46,7 @@
   ],
   "os": [
     "darwin",
+    "linux",
     "win32"
   ],
   "cpu": [

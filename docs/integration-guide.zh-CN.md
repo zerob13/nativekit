@@ -18,7 +18,7 @@ context-isolated preload
 Electron main process
     │
     ▼
-@zerob13/nativekit → Node-API → AppKit / Win32
+@zerob13/nativekit → Node-API → AppKit / Win32 / XCB
 ```
 
 建议目录：
@@ -36,13 +36,30 @@ src/
 pnpm add @zerob13/nativekit
 ```
 
-发布包支持 Electron 28+、macOS arm64/x64 和 Windows x64。Node-API v8 让同一
-预编译文件可跨兼容的 Electron ABI 使用，不需要为每个 Electron 版本单独编译。
+发布预编译文件支持 Electron 28+、macOS arm64/x64 和 Windows x64。Linux
+x64/arm64 当前是 build-only 目标，需要从源码构建，暂不随 release 发布。
+Node-API v8 让同一预编译文件可跨兼容的 Electron ABI 使用，不需要为每个
+Electron 版本单独编译。
 
 ## 2. 主窗口和 Overlay
 
 Overlay host 需要最新的内容区域和原生窗口句柄。创建窗口后启动 Overlay，并在
 窗口移动、缩放或跨显示器时合并更新；不要把每个鼠标移动事件发送给 Renderer。
+
+Linux 的 Overlay 与窗口查询要求 X11/XWayland。若系统默认进入原生 Wayland，
+必须在创建任何窗口前选择 X11 Ozone backend：
+
+```ts
+import { app } from 'electron'
+
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('ozone-platform', 'x11')
+}
+```
+
+GNOME、KDE Plasma、Cinnamon、Xfce 与 MATE 的 X11 会话属于支持范围。原生
+Wayland 不允许普通客户端读取其他应用窗口或全局坐标，也不允许任意定位顶层窗口，
+因此不能用桌面环境专用脚本伪装成统一支持。
 
 ```ts
 import { fileURLToPath } from 'node:url'
@@ -196,6 +213,7 @@ app.on('will-quit', () => overlay.stop())
 ## 3. 系统窗口查询
 
 这些方法返回统一的 Electron DIP 坐标；Windows 物理像素转换在库内部完成。
+Linux 使用 X11 root-window 坐标，原生 Wayland 下不可用。
 
 ```ts
 import { windows } from '@zerob13/nativekit'
@@ -223,7 +241,8 @@ const icon = await apps.icon(applicationPath, { size: 'medium' })
 
 返回值是精确 16×16（`small`）或 32×32（`medium`）PNG data URL；无法读取时是
 `null`。macOS 可传 `.app` 或其可执行文件绝对路径，Windows 传 Shell 可识别的
-文件绝对路径。
+文件绝对路径；Linux 可传 `.desktop`、可执行文件、AppImage 或其他文件的绝对
+路径，并通过 GIO 与 freedesktop 图标主题解析。找不到应用条目时可能返回通用文件图标。
 
 ## 5. 打包 Electron 应用
 
@@ -253,6 +272,10 @@ macOS x64 app   → darwin-x64 prebuild
 Windows x64 app → win32-x64 prebuild
 ```
 
+Linux build CI 会生成 `linux-x64` 与 `linux-arm64` 检查产物，但 release workflow
+暂不打包它们。Linux 应用在这一阶段应固定到源码构建产物，不应假设 npm tarball
+已经包含 Linux prebuild。
+
 ## 6. 验证和故障排查
 
 仓库内 demo 是可运行的参考实现：
@@ -277,4 +300,6 @@ pnpm demo:smoke
 | `nativekit must run in the Electron main process` | Renderer 导入了包；移动到 main 并缩窄 preload API。 |
 | `no native binary for ...` | 缺少对应 prebuild，或打包时未复制/解包 `prebuilds/`。 |
 | `windowHandle has an unexpected size` | 修改了 Electron 返回的 Buffer；应原样传递。 |
+| `Linux window APIs require an available X11 display` | 当前是无显示环境或原生 Wayland；提供 `DISPLAY`，并以 `--ozone-platform=x11` 启动 Electron。 |
+| `overlays require Electron to use X11/XWayland` | Electron 没有提供可验证的 X11 窗口句柄；在创建窗口前切换 Electron Ozone backend。 |
 | Overlay 回到锚点 | presentation 被删除重建、调用了 relocate，或重启了 Overlay。 |

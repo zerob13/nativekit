@@ -12,7 +12,9 @@ Cross-platform native desktop primitives for the Electron main process.
 - system-window enumeration and hit testing;
 - exact-size operating-system application icons.
 
-Supported release targets are macOS arm64/x64 and Windows x64.
+Implemented targets are macOS arm64/x64, Windows x64, and Linux x64/arm64.
+Linux currently targets X11/XWayland and is validated as a build-only target;
+Linux prebuilds are not published by the release workflow yet.
 
 ## Why this library exists
 
@@ -44,6 +46,11 @@ darwin-arm64
 darwin-x64
 win32-x64
 ```
+
+Linux users can build the current source on an X11-capable desktop. The normal
+release workflow intentionally does not publish `linux-x64` or `linux-arm64`
+prebuilds until the implementation has also been exercised on real GNOME and
+KDE systems.
 
 `node-gyp-build` selects the matching artifact. A consumer can explicitly build
 from source through the included `binding.gyp`, but normal installation should
@@ -95,7 +102,15 @@ Requirements:
 - pnpm 10;
 - CMake 3.22 or newer;
 - Xcode command-line tools on macOS; or
-- Visual Studio C++ Build Tools on Windows.
+- Visual Studio C++ Build Tools on Windows; or
+- GLib/GIO, GdkPixbuf, XCB, XCB RandR, and `pkg-config` development packages
+  on Linux.
+
+Debian and Ubuntu source builds can install the Linux dependencies with:
+
+```bash
+sudo apt-get install build-essential pkg-config libgdk-pixbuf-2.0-dev libglib2.0-dev libxcb1-dev libxcb-randr0-dev
+```
 
 ```bash
 pnpm install
@@ -120,8 +135,8 @@ pnpm demo:smoke
 
 Interactive mode supports direct native-panel movement, multi-image selection
 with five-second rotation, and real application selection. Smoke mode validates
-window enumeration, icon extraction, and overlay rendering. A successful macOS
-run prints one `NATIVEKIT_DEMO_SMOKE` JSON record and exits with status 0.
+window enumeration, icon extraction, and overlay rendering. A successful run
+prints one `NATIVEKIT_DEMO_SMOKE` JSON record and exits with status 0.
 
 ```text
 ┌ nativekit demo ───────────────────────────────────────┐
@@ -138,17 +153,25 @@ run prints one `NATIVEKIT_DEMO_SMOKE` JSON record and exits with status 0.
 
 ## Platform behavior
 
-| Capability | macOS | Windows |
-|---|---|---|
-| Overlay | draggable non-activating `NSPanel`, all Spaces | draggable host-owned layered topmost `HWND`, current virtual desktop |
-| Window query | CoreGraphics + NSWorkspace | EnumWindows + DWM |
-| App icon | NSWorkspace | Shell + WIC |
-| Public coordinates | Electron DIP | native pixels normalized to Electron DIP |
+| Capability | macOS | Windows | Linux X11/XWayland |
+|---|---|---|---|
+| Overlay | draggable non-activating `NSPanel`, all Spaces | draggable host-owned layered topmost `HWND`, current virtual desktop | draggable non-focusing XCB utility window on a dedicated X11 event thread; workspace behavior depends on the window manager |
+| Window query | CoreGraphics + NSWorkspace | EnumWindows + DWM | XCB + EWMH/ICCCM |
+| App icon | NSWorkspace | Shell + WIC | GIO desktop entries + freedesktop icon themes + GdkPixbuf |
+| Public coordinates | Electron DIP | native pixels normalized to Electron DIP | X11 root coordinates matching Electron's X11 window model |
 
 macOS arm64 has local native, demo, and visual verification. Windows code is
 implemented and statically reviewed; the CI/release matrix makes an MSVC build
-and native integration pass mandatory because this repository is developed on
-macOS.
+and native integration pass mandatory. Linux x64 and arm64 run native tests and
+the Electron smoke demo under Xvfb/Openbox in build CI.
+
+Native Wayland is not supported by the window-query or overlay modules. Wayland
+does not expose other clients' surfaces or global coordinates to a regular
+client, and it prevents arbitrary top-level placement. Launch Electron with
+`--ozone-platform=x11` when these capabilities are required. Icon extraction
+can still work under Wayland, but it is not a substitute for the unavailable
+window APIs. See [the Linux support plan](docs/linux-support-plan.md) for the
+scope and deferred compositor-specific work.
 
 ## Publish to npm
 

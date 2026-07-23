@@ -396,7 +396,10 @@ function requireAbsolutePath(
 }
 
 function requireBuffer(value: unknown, name: string): asserts value is Buffer {
-  if (!Buffer.isBuffer(value) || value.byteLength !== 8) {
+  const isBuffer = Buffer.isBuffer(value)
+  const byteLength = isBuffer ? value.byteLength : 0
+  const expectedByteLength = process.platform === 'linux' ? 4 : 8
+  if (!isBuffer || byteLength !== expectedByteLength) {
     throw new TypeError(
       `${name} must be the Buffer returned by getNativeWindowHandle()`,
     )

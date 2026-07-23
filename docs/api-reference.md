@@ -16,7 +16,9 @@ off the main thread later.
 
 Every public point and rectangle uses Electron device-independent pixels (DIP)
 with a top-left screen origin. macOS points already use this model. On Windows,
-the wrapper converts between Electron DIP and native physical pixels.
+the wrapper converts between Electron DIP and native physical pixels. Linux
+uses X11 root-window coordinates and therefore requires Electron to run through
+X11/XWayland.
 
 ```ts
 interface Point {
@@ -34,7 +36,14 @@ interface Rect extends Point {
 
 Floating image panels with host, presentation, and session lifecycle. macOS
 panels join all Spaces. Windows panels are owned by their host window and remain
-topmost on their current virtual desktop.
+topmost on their current virtual desktop. Linux uses non-focusing XCB utility
+windows on a dedicated X11 event thread and requests keep-above, taskbar/pager
+exclusion, and all-workspace placement from the window manager.
+
+Linux overlays do not support native Wayland. Electron must expose an X11
+`Window`, normally by starting with `--ozone-platform=x11`; otherwise
+`overlay.start()` throws an explicit error. Workspace and keep-above policy can
+vary between EWMH window managers.
 
 The user can drag a panel by its visible surface outside the controls.
 Manual placement survives host and image updates, remains inside the selected
@@ -78,20 +87,22 @@ interface OverlayOptions {
 
 Pass `BrowserWindow.getContentBounds()` as `bounds` and
 `BrowserWindow.getNativeWindowHandle()` as `windowHandle`. Width and height
-constrain panel sizing; the native handle selects the correct display and owns
-the panel on Windows. Refresh the host after the BrowserWindow moves, resizes,
-or changes display.
+constrain panel sizing; the native handle selects the correct display, owns the
+panel on Windows, and supplies the X11 transient-parent hint on Linux. Refresh
+the host after the BrowserWindow moves, resizes, or changes display.
 
 `imageData` must be a PNG or JPEG base64 data URL no longer than 32 MiB. Decoded
 images are limited to 8192 pixels per dimension and 64 MiB of RGBA pixels.
-`appIconPath` is a `.app` path on macOS or executable path on Windows.
+`appIconPath` is a `.app` path on macOS, a Shell-readable path on Windows, or an
+absolute `.desktop`, executable, AppImage, or file path on Linux.
 
 ### Methods
 
 #### `overlay.start(options?: OverlayOptions): boolean`
 
 Start the platform renderer or update its tooltip options. Repeated calls are
-safe.
+safe. The first Linux X11 renderer draws the controls but does not display
+hover tooltips; the strings remain accepted for API symmetry.
 
 #### `overlay.stop(): boolean`
 
@@ -216,7 +227,12 @@ interface FrontmostWindow {
 `level` is the front-to-back z-order position; lower values are nearer the
 front. OS filtering can leave gaps. `isOnscreen` means visible, not minimized or
 cloaked, and intersecting a display. `bundleId` is a bundle identifier (or app
-path fallback) on macOS and the executable path on Windows.
+path fallback) on macOS and the executable path on Windows or Linux.
+
+Linux window methods require an X11/XWayland display and an EWMH-compatible
+window manager for complete stacking data. The implementation falls back to the
+X11 root window tree when `_NET_CLIENT_LIST_STACKING` is unavailable. Native
+Wayland window enumeration and hit testing are unsupported.
 
 #### `windows.frontmost(): Promise<FrontmostWindow | null>`
 
@@ -247,6 +263,9 @@ read. `small` is 16×16 and `medium` is 32×32.
 
 - macOS: absolute `.app` bundle or executable path.
 - Windows: absolute executable or file path understood by the Shell.
+- Linux: absolute `.desktop`, executable, AppImage, or file path. Installed
+  freedesktop icon themes are searched; an existing unmatched path may return
+  a generic file icon.
 
 ```ts
 const icon = await apps.icon('/Applications/Safari.app', { size: 'medium' })

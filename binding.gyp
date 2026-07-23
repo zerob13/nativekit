@@ -70,6 +70,23 @@
               "LanguageStandard": "stdcpp17"
             }
           }
+        }],
+        ["OS=='linux'", {
+          "sources": [
+            "src/apps/linux/icon.cpp",
+            "src/common/linux/image_utils.cpp",
+            "src/overlay/linux/overlay_window.cpp",
+            "src/windows/linux/window_query.cpp"
+          ],
+          "cflags": [
+            "<!@(pkg-config --cflags gdk-pixbuf-2.0 gio-unix-2.0 xcb xcb-randr)"
+          ],
+          "defines": [
+            "GLIB_VERSION_MIN_REQUIRED=GLIB_VERSION_2_56"
+          ],
+          "libraries": [
+            "<!@(pkg-config --libs gdk-pixbuf-2.0 gio-unix-2.0 xcb xcb-randr)"
+          ]
         }]
       ]
     }

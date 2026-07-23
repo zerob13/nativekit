@@ -56,17 +56,19 @@ function handle(channel, handler) {
 
 function attachOverlayHost() {
   if (!mainWindow || mainWindow.isDestroyed()) return
+  const windowHandle = mainWindow.getNativeWindowHandle()
   if (!overlayStarted) {
     overlay.start({
       tooltip: { hide: 'Hide', relocate: 'Move to next anchor' },
     })
     overlayStarted = true
   }
+  const bounds = mainWindow.getContentBounds()
   overlay.attachHost({
     id: hostId,
     title: 'nativekit demo',
-    bounds: mainWindow.getContentBounds(),
-    windowHandle: mainWindow.getNativeWindowHandle(),
+    bounds,
+    windowHandle,
     anchor: { edge: 'trailing', offset: 24 },
   })
 }
@@ -322,8 +324,8 @@ function createWindow() {
   mainWindow.on('resize', scheduleOverlayHostUpdate)
   mainWindow.on('move', scheduleOverlayHostUpdate)
   mainWindow.once('ready-to-show', () => {
-    attachOverlayHost()
     mainWindow.show()
+    setImmediate(attachOverlayHost)
   })
   mainWindow.on('closed', () => {
     if (boundsTimer !== null) clearTimeout(boundsTimer)

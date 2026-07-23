@@ -8,7 +8,8 @@
 TypeScript API 与 Node-API v8 插件组成，JavaScript 部分使用 Vite library
 mode 打包，原生部分继续使用 CMake/cmake-js。
 
-当前支持 macOS arm64/x64 与 Windows x64，主要提供：
+当前实现 macOS arm64/x64、Windows x64，以及 Linux x64/arm64。Linux 首版只支持
+X11/XWayland，当前仅进入 build CI，不加入 release workflow。主要提供：
 
 - 可拖动、不会抢占应用焦点的原生图片 Overlay；
 - 前台应用、系统窗口枚举、查找与坐标命中；
@@ -29,6 +30,9 @@ darwin-arm64
 darwin-x64
 win32-x64
 ```
+
+Linux 目前需要从源码构建；`linux-x64` 与 `linux-arm64` 预编译文件暂不随 npm
+release 发布，等待在真实 GNOME 与 KDE 设备上补充运行验证后再进入发布流程。
 
 库只能在 Electron 主进程导入。Renderer 应通过启用
 `contextIsolation` 的 preload 暴露最小业务接口，不能直接暴露整个模块。
@@ -96,13 +100,25 @@ Smoke 模式会集中验证窗口枚举、图标与 Overlay 渲染。
 ## 本地开发
 
 要求 Node.js 20.19+、pnpm 10、CMake 3.22+，以及 macOS 的 Xcode Command
-Line Tools 或 Windows 的 Visual Studio C++ Build Tools。
+Line Tools、Windows 的 Visual Studio C++ Build Tools，或 Linux 的
+GLib/GIO、GdkPixbuf、XCB、XCB RandR 与 `pkg-config` 开发包。
+Debian/Ubuntu 可安装：
+
+```bash
+sudo apt-get install build-essential pkg-config libgdk-pixbuf-2.0-dev libglib2.0-dev libxcb1-dev libxcb-randr0-dev
+```
 
 ```bash
 pnpm build:js       # Vite ESM/CJS + TypeScript declarations
 pnpm build:native   # CMake + cmake-js
 pnpm check
 ```
+
+Linux 的 Overlay 和窗口查询要求 Electron 运行在 X11/XWayland。原生 Wayland
+不会向普通客户端暴露其他应用窗口、全局坐标或任意顶层窗口定位；需要这些能力时，
+请使用 `--ozone-platform=x11` 启动 Electron。GNOME、KDE Plasma、Cinnamon、
+Xfce 与 MATE 的 X11 会话属于首版支持范围。完整边界见
+[Linux support plan](docs/linux-support-plan.md)。
 
 完整的主进程、preload、Renderer、打包和故障排查示例见
 [Electron 集成指南](docs/integration-guide.zh-CN.md)。全部方法与事件定义见

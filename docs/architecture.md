@@ -2,15 +2,15 @@
 
 ## 1. Scope and constraints
 
-`nativekit` is a main-process-only Electron library for macOS and Windows. It
-combines a small TypeScript API with a Node-API v8 addon. The public API is the
-same on both operating systems; platform differences that cannot be removed are
-called out explicitly.
+`nativekit` is a main-process-only Electron library for macOS, Windows, and
+Linux X11/XWayland. It combines a small TypeScript API with a Node-API v8 addon.
+The public API is the same on every implementation; platform differences that
+cannot be removed are called out explicitly.
 
 The project follows five constraints:
 
-1. One Node-API binding with two native platform tails.
-2. C++17 for shared and Windows code; Objective-C++ for AppKit code.
+1. One Node-API binding with symmetric native platform tails.
+2. C++17 for shared, Windows, and Linux code; Objective-C++ for AppKit code.
 3. No JavaScript call from a native worker thread. Every callback crosses one
    `Napi::ThreadSafeFunction`.
 4. Native handles are owned by module managers and released by explicit stop
@@ -37,7 +37,8 @@ nativekit.node                        node-addon-api, N-API v8
         │
         ├── shared managers           validation, state, event dispatch
         ├── macOS tail                AppKit / CoreGraphics
-        └── Windows tail              Win32 / WIC / Shell
+        ├── Windows tail              Win32 / WIC / Shell
+        └── Linux tail                GIO / GdkPixbuf / XCB
 ```
 
 The TypeScript wrapper performs main-process checks, input validation, Promise
@@ -60,14 +61,17 @@ src/
     types.h                   shared Point, Rect, and window records
     mac/image_utils.*         AppKit image encode/decode
     win/image_utils.*         WIC and Shell icon encode/decode
+    linux/image_utils.*       GdkPixbuf encode/decode and GIO icon lookup
   overlay/
     overlay_manager.*         host/session/presentation state
     mac/overlay_window.mm     NSPanel renderer and controls
     win/overlay_window.cpp    layered HWND renderer and message pump
+    linux/overlay_window.cpp  XCB renderer, controls, and event thread
   windows/
     window_query.*            Node-API module boundary
     mac/window_query.mm       CGWindowList and NSWorkspace
     win/window_query.cpp      EnumWindows, DWM, foreground window
+    linux/window_query.cpp    XCB, EWMH stacking, active window
   apps/                       exact-size application icon extraction
 js/index.ts                   public TypeScript API
 examples/electron/            context-isolated capability demo
@@ -106,14 +110,27 @@ CreateWindowEx(..., host HWND, ...)
 UpdateLayeredWindow(PBGRA) + HWND_TOPMOST
 ```
 
-Both tails preserve image aspect ratio, render an optional application-icon
-badge, provide hide/relocate tooltips, scale controls for DPI, skip suppressed
-items in stack layout, and hide overflow items rather than overlap them. A user
-drag moves the native window directly without renderer IPC. The platform tail
-then owns the presentation's manual origin, clamps it to the current work area,
-and keeps its anchor-stack slot stable until relocate clears that state.
-macOS panels can join all Spaces; Windows topmost windows remain on their current
-virtual desktop because Win32 has no supported equivalent.
+All tails preserve image aspect ratio, render an optional application-icon
+badge, scale controls, skip suppressed items in stack layout, and hide overflow
+items rather than overlap them. A user drag moves the native window directly
+without renderer IPC. The platform tail then owns the presentation's manual
+origin, clamps it to the current work area, and keeps its anchor-stack slot
+stable until relocate clears that state. macOS and Windows provide native
+hide/relocate hover tooltips; the first X11 renderer accepts the same strings
+but does not draw tooltip windows.
+
+Linux uses one dedicated XCB event thread and one undecorated, non-focusing
+utility window per presentation. XCB RandR selects the host monitor; EWMH
+properties request transient-parent, keep-above, taskbar/pager exclusion, and
+all-workspace behavior. Image decode and scaling use display-independent
+GdkPixbuf APIs. This avoids initializing GTK inside Electron and keeps X11
+round trips off the Electron UI thread. EWMH window managers may apply
+workspace policy differently.
+
+Native Wayland is deliberately excluded from `overlay`. Wayland clients cannot
+choose global top-level positions, and Electron's native handle contract for
+this integration is an X11 `Window`. Electron must run through X11/XWayland
+when the overlay is used.
 
 ### 4.2 `windows`
 
@@ -125,13 +142,18 @@ reference window and every window above it. Hidden windows remain in `list()`;
 CoreGraphics and Win32 use different coordinate spaces. The Electron-facing API
 normalizes screen points and rectangles to device-independent pixels (DIP) on
 Windows through Electron's `screen` module. macOS points already match Electron
-DIP semantics.
+DIP semantics. Linux reads the EWMH client stacking list and X11 root-window
+coordinates through XCB, which matches Electron's X11/XWayland window model.
+Native Wayland does not provide the required global window model.
 
 ### 4.3 `apps`
 
 `apps.icon()` resolves the operating-system icon and rasterizes it to exactly
 16×16 or 32×32 PNG pixels. macOS uses `NSWorkspace`; Windows uses Shell icon
-lookup plus WIC scaling and PNG encoding.
+lookup plus WIC scaling and PNG encoding. Linux matches `.desktop` entries and
+executables through GIO, searches installed freedesktop icon themes, and uses
+GdkPixbuf for exact-size PNG output. A generic file icon is the fallback for an
+existing path without an application entry.
 
 ## 5. Threading and cleanup
 
@@ -142,7 +164,8 @@ Electron main/UI thread
   └── ThreadSafeFunction delivery
 
 Native worker threads
-  └── Windows overlay message pump (STA)
+  ├── Windows overlay message pump (STA)
+  └── Linux XCB event loop
 ```
 
 The Node environment cleanup hook calls independent `noexcept` cleanup
@@ -162,7 +185,7 @@ pnpm check          # package build, typecheck, integration tests
 pnpm demo:smoke     # Electron end-to-end capability demo
 ```
 
-Release CI builds and tests these targets independently:
+Release CI builds and tests these published targets independently:
 
 ```text
 prebuilds/darwin-arm64/nativekit.napi.node
@@ -170,10 +193,15 @@ prebuilds/darwin-x64/nativekit.napi.node
 prebuilds/win32-x64/nativekit.napi.node
 ```
 
-The publish job assembles all three artifacts, builds the Vite library, verifies
-the npm tarball, publishes that tarball, and attaches the same archive to the
-GitHub release. `node-gyp-build` prefers the matching Node-API prebuild and falls
-back to `binding.gyp` when a consumer explicitly builds from source.
+Build-only CI additionally compiles `linux-x64` and `linux-arm64` on native
+Ubuntu 22.04 runners. It starts Xvfb, Openbox, and an X11 fixture client, then
+runs both the native integration suite and the Electron demo smoke flow. These
+artifacts are uploaded for inspection but are not consumed by `release.yml`.
+
+The publish job assembles the three released artifacts, builds the Vite library,
+verifies the npm tarball, publishes that tarball, and attaches the same archive
+to the GitHub release. `node-gyp-build` prefers the matching Node-API prebuild
+and falls back to `binding.gyp` when a consumer explicitly builds from source.
 
 The renderer demo never imports the addon. A narrow context-isolated preload
 exposes domain operations over validated `ipcMain.handle` channels; mutable
