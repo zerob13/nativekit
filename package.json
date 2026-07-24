@@ -1,6 +1,6 @@
 {
   "name": "@zerob13/nativekit",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Cross-platform native capabilities for Electron: overlays, window awareness, and app icons.",
   "type": "module",
   "main": "./dist/index.cjs",
