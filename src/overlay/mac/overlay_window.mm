@@ -164,6 +164,18 @@ NSColor* control_foreground(nativekit::OverlayToolbarStyle style) {
   return NSColor.labelColor;
 }
 
+NSColor* control_border(nativekit::OverlayToolbarStyle style) {
+  switch (style) {
+    case nativekit::OverlayToolbarStyle::kLight:
+      return [NSColor colorWithWhite:0 alpha:0.22];
+    case nativekit::OverlayToolbarStyle::kDark:
+      return [NSColor colorWithWhite:1 alpha:0.28];
+    case nativekit::OverlayToolbarStyle::kSystem:
+      return NSColor.separatorColor;
+  }
+  return NSColor.separatorColor;
+}
+
 bool controls_equal(
     const std::vector<nativekit::OverlayControl>& first,
     const std::vector<nativekit::OverlayControl>& second) {
@@ -191,6 +203,97 @@ bool controls_equal(
 - (BOOL)canBecomeMainWindow {
   return NO;
 }
+@end
+
+@interface NativekitOverlayToolbarButton : NSButton
+- (void)setToolbarStyle:(nativekit::OverlayToolbarStyle)style;
+- (void)updateAppearance;
+@end
+
+@implementation NativekitOverlayToolbarButton {
+  nativekit::OverlayToolbarStyle toolbar_style_;
+  NSTrackingArea* tracking_area_;
+  BOOL hovering_;
+}
+
+- (instancetype)initWithFrame:(NSRect)frame {
+  self = [super initWithFrame:frame];
+  if (self == nil) return nil;
+
+  toolbar_style_ = nativekit::OverlayToolbarStyle::kSystem;
+  self.bordered = NO;
+  self.focusRingType = NSFocusRingTypeNone;
+  self.imagePosition = NSImageOnly;
+  self.imageScaling = NSImageScaleProportionallyDown;
+  self.wantsLayer = YES;
+  self.layer.masksToBounds = YES;
+  self.layer.borderWidth = 1;
+  [self updateAppearance];
+  return self;
+}
+
+- (void)setToolbarStyle:(nativekit::OverlayToolbarStyle)style {
+  toolbar_style_ = style;
+  [self updateAppearance];
+}
+
+- (void)layout {
+  [super layout];
+  self.layer.cornerRadius =
+      std::floor(std::min(NSWidth(self.bounds), NSHeight(self.bounds)) / 2);
+}
+
+- (void)updateTrackingAreas {
+  [super updateTrackingAreas];
+  if (tracking_area_ != nil) [self removeTrackingArea:tracking_area_];
+  tracking_area_ = [[NSTrackingArea alloc]
+      initWithRect:NSZeroRect
+           options:NSTrackingMouseEnteredAndExited |
+                   NSTrackingActiveAlways |
+                   NSTrackingInVisibleRect
+             owner:self
+          userInfo:nil];
+  [self addTrackingArea:tracking_area_];
+}
+
+- (void)mouseEntered:(NSEvent*)event {
+  hovering_ = YES;
+  [self updateAppearance];
+}
+
+- (void)mouseExited:(NSEvent*)event {
+  hovering_ = NO;
+  [self updateAppearance];
+}
+
+- (void)setHighlighted:(BOOL)highlighted {
+  [super setHighlighted:highlighted];
+  [self updateAppearance];
+}
+
+- (void)viewDidChangeEffectiveAppearance {
+  [super viewDidChangeEffectiveAppearance];
+  [self updateAppearance];
+}
+
+- (void)updateAppearance {
+  NSColor* foreground = control_foreground(toolbar_style_);
+  NSColor* background = control_background(toolbar_style_);
+  if (self.highlighted) {
+    background =
+        [background blendedColorWithFraction:0.18 ofColor:foreground];
+  } else if (hovering_) {
+    background =
+        [background blendedColorWithFraction:0.1 ofColor:foreground];
+  }
+  NSAppearance* appearance = self.effectiveAppearance;
+  [appearance performAsCurrentDrawingAppearance:^{
+    self.layer.backgroundColor = background.CGColor;
+    self.layer.borderColor = control_border(toolbar_style_).CGColor;
+    self.contentTintColor = foreground;
+  }];
+}
+
 @end
 
 @interface NativekitOverlayView : NSView <NSWindowDelegate>
@@ -341,17 +444,13 @@ bool controls_equal(
 
   for (std::size_t index = 0; index < controls_.size(); ++index) {
     const auto& control = controls_[index];
-    NSButton* button = [NSButton
-        buttonWithImage:control_image(control)
-                 target:self
-                 action:@selector(controlOverlay:)];
+    auto* button =
+        [[NativekitOverlayToolbarButton alloc] initWithFrame:NSZeroRect];
+    button.image = control_image(control);
+    button.target = self;
+    button.action = @selector(controlOverlay:);
     button.tag = static_cast<NSInteger>(index);
-    button.bezelStyle = NSBezelStyleCircular;
-    button.bordered = YES;
-    button.focusRingType = NSFocusRingTypeNone;
-    button.bezelColor = control_background(style);
-    button.contentTintColor = control_foreground(style);
-    button.imageScaling = NSImageScaleProportionallyDown;
+    [button setToolbarStyle:style];
     button.toolTip = ns_string(control.tooltip);
     button.accessibilityLabel = control.tooltip.empty()
         ? ns_string(control.id)
