@@ -160,6 +160,14 @@ jobs:
         run: |
           node_file=$(find build -name 'nativekit.node' -type f -print -quit)
           test -n "$node_file"
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            dependencies=$(MSYS2_ARG_CONV_EXCL='*' dumpbin.exe /dependents "$node_file")
+            if grep -Eiq '(CONCRT|MSVCP|VCRUNTIME)[^[:space:]]*\.dll' <<< "$dependencies"; then
+              printf '%s\n' "$dependencies" >&2
+              printf 'Windows prebuild must not depend on the VC++ Redistributable.\n' >&2
+              exit 1
+            fi
+          fi
           if [ "${{ runner.os }}" = "macOS" ]; then
             minos=$(xcrun vtool -show-build "$node_file" | awk '$1 == "minos" { print $2; exit }')
             test "$minos" = "12.0"

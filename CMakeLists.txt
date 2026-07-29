@@ -110,7 +110,7 @@ endif()
 if(WIN32)
   set_property(
     TARGET nativekit
-    PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL"
+    PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
   )
   target_compile_definitions(nativekit PRIVATE
     NOMINMAX
